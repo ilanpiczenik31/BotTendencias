@@ -1,74 +1,83 @@
-from .base import BaseScraper, ScrapedProduct
-from playwright.async_api import BrowserContext
+from .base import BaseScraper, ScrapedProduct, fetch_page, parse_price, find_image, find_link
 import logging
 
 logger = logging.getLogger(__name__)
+
+SECTIONS = [
+    ("https://www2.hm.com/es_es/mujer/novedades/ver-todo.html", "new_arrivals"),
+    ("https://www2.hm.com/es_es/hombre/novedades/ver-todo.html", "new_arrivals"),
+]
+
+PRODUCT_SELECTORS = [
+    "li.product-item",
+    "article.product-item",
+    "li[class*='product']",
+    "[data-articlecode]",
+    "[class*='product-tile']",
+]
+
+NAME_SELECTORS = [
+    "h2.item-heading a",
+    "[class*='item-heading']",
+    "[class*='product-title']",
+    "[class*='product-name']",
+    "h2", "h3",
+]
+
+PRICE_SELECTORS = [
+    "span.price.regular",
+    "[class*='price-value']",
+    "[class*='product-price']",
+    "[class*='price']",
+]
 
 
 class HMScraper(BaseScraper):
     store_name = "H&M"
     store_url = "https://www2.hm.com/es_es/"
 
-    async def _scrape(self, context: BrowserContext) -> list[ScrapedProduct]:
+    async def _scrape(self) -> list[ScrapedProduct]:
         products: list[ScrapedProduct] = []
 
-        sections = [
-            ("https://www2.hm.com/es_es/mujer/novedades/ver-todo.html", "new_arrivals"),
-            ("https://www2.hm.com/es_es/hombre/novedades/ver-todo.html", "new_arrivals"),
-            ("https://www2.hm.com/es_es/mujer/tendencias.html", "trending"),
-        ]
-
-        for url, section in sections:
-            page = await self._get_page(context)
+        for url, section in SECTIONS:
             try:
-                await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-                await page.wait_for_timeout(3000)
+                soup = await fetch_page(url, country="es", wait=5000)
 
-                try:
-                    await page.click("#onetrust-accept-btn-handler", timeout=3000)
-                    await page.wait_for_timeout(1000)
-                except Exception:
-                    pass
+                items = []
+                for sel in PRODUCT_SELECTORS:
+                    items = soup.select(sel)
+                    if items:
+                        break
 
-                for _ in range(4):
-                    await page.evaluate("window.scrollBy(0, window.innerHeight)")
-                    await page.wait_for_timeout(1500)
-
-                items = await page.query_selector_all("li.product-item")
                 for item in items[:30]:
-                    try:
-                        name_el = await item.query_selector("h2.item-heading a")
-                        name = (await name_el.inner_text()).strip() if name_el else None
+                    name = None
+                    for sel in NAME_SELECTORS:
+                        el = item.select_one(sel)
+                        if el and el.get_text(strip=True):
+                            name = el.get_text(strip=True)
+                            break
 
-                        price_el = await item.query_selector("span.price.regular")
-                        if not price_el:
-                            price_el = await item.query_selector("span.price")
-                        price_raw = (await price_el.inner_text()).strip() if price_el else None
+                    price_raw = None
+                    for sel in PRICE_SELECTORS:
+                        el = item.select_one(sel)
+                        if el:
+                            price_raw = el.get_text(strip=True)
+                            break
 
-                        img_el = await item.query_selector("img.item-image")
-                        image_url = await img_el.get_attribute("src") if img_el else None
-                        if image_url and image_url.startswith("//"):
-                            image_url = "https:" + image_url
+                    img = find_image(item)
+                    if img and img.startswith("//"):
+                        img = "https:" + img
 
-                        link_el = await item.query_selector("a.item-link")
-                        product_url = await link_el.get_attribute("href") if link_el else None
-                        if product_url and not product_url.startswith("http"):
-                            product_url = "https://www2.hm.com" + product_url
-
-                        if name:
-                            products.append(ScrapedProduct(
-                                name=name,
-                                section=section,
-                                price=self._parse_price(price_raw),
-                                image_url=image_url,
-                                product_url=product_url,
-                                category="ropa",
-                            ))
-                    except Exception as e:
-                        logger.debug(f"H&M item parse error: {e}")
+                    if name:
+                        products.append(ScrapedProduct(
+                            name=name,
+                            section=section,
+                            price=parse_price(price_raw),
+                            image_url=img,
+                            product_url=find_link(item, "https://www2.hm.com"),
+                            category="ropa",
+                        ))
             except Exception as e:
-                logger.error(f"H&M section {url} error: {e}")
-            finally:
-                await page.close()
+                logger.error(f"H&M {url}: {e}")
 
         return products

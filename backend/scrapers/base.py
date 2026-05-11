@@ -1,11 +1,17 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
-from playwright.async_api import async_playwright, Browser, BrowserContext, Page
+from bs4 import BeautifulSoup, Tag
+import httpx
 import asyncio
 import logging
+import os
+import re
 
 logger = logging.getLogger(__name__)
+
+SCRAPER_API_KEY = os.getenv("SCRAPER_API_KEY", "")
+SCRAPER_API_BASE = "http://api.scraperapi.com"
 
 
 @dataclass
@@ -19,69 +25,66 @@ class ScrapedProduct:
     category: Optional[str] = None
 
 
+async def fetch_page(url: str, country: str = "es", wait: int = 3000) -> BeautifulSoup:
+    """Fetch a page through ScraperAPI (residential IPs + JS rendering)."""
+    params = {
+        "api_key": SCRAPER_API_KEY,
+        "url": url,
+        "render": "true",
+        "country_code": country,
+        "wait_for_selector": "body",
+        "wait": str(wait),
+    }
+    async with httpx.AsyncClient(timeout=90) as client:
+        resp = await client.get(SCRAPER_API_BASE, params=params)
+        resp.raise_for_status()
+        return BeautifulSoup(resp.text, "lxml")
+
+
+def parse_price(raw: Optional[str]) -> Optional[float]:
+    if not raw:
+        return None
+    cleaned = re.sub(r"[^\d,.]", "", raw.replace(",", "."))
+    # Take first number-like string
+    match = re.search(r"\d+\.?\d*", cleaned)
+    try:
+        return float(match.group()) if match else None
+    except ValueError:
+        return None
+
+
+def find_image(tag: Tag) -> Optional[str]:
+    for img in tag.find_all("img"):
+        src = img.get("src") or img.get("data-src") or img.get("data-lazy-src") or ""
+        if src and not src.endswith(".gif") and "placeholder" not in src.lower():
+            return src if src.startswith("http") else None
+    return None
+
+
+def find_link(tag: Tag, base_url: str) -> Optional[str]:
+    a = tag.find("a", href=True)
+    if not a:
+        return None
+    href = a["href"]
+    if href.startswith("http"):
+        return href
+    return base_url.rstrip("/") + "/" + href.lstrip("/")
+
+
 class BaseScraper(ABC):
     store_name: str = ""
     store_url: str = ""
-
-    def __init__(self):
-        self._browser: Optional[Browser] = None
-
-    async def _get_page(self, context: BrowserContext) -> Page:
-        page = await context.new_page()
-        await page.set_extra_http_headers({
-            "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        })
-        return page
+    country: str = "es"
 
     async def scrape(self) -> list[ScrapedProduct]:
-        async with async_playwright() as pw:
-            browser = await pw.chromium.launch(
-                headless=True,
-                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
-            )
-            context = await browser.new_context(
-                viewport={"width": 1280, "height": 800},
-                user_agent=(
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/124.0.0.0 Safari/537.36"
-                ),
-            )
-            try:
-                products = await self._scrape(context)
-                logger.info(f"[{self.store_name}] scraped {len(products)} products")
-                return products
-            except Exception as e:
-                logger.error(f"[{self.store_name}] scrape failed: {e}")
-                return []
-            finally:
-                await browser.close()
+        try:
+            products = await self._scrape()
+            logger.info(f"[{self.store_name}] scraped {len(products)} products")
+            return products
+        except Exception as e:
+            logger.error(f"[{self.store_name}] scrape failed: {e}")
+            return []
 
     @abstractmethod
-    async def _scrape(self, context: BrowserContext) -> list[ScrapedProduct]:
-        """Implement per-store scraping logic."""
+    async def _scrape(self) -> list[ScrapedProduct]:
         ...
-
-    async def _safe_get_text(self, page: Page, selector: str) -> Optional[str]:
-        try:
-            el = await page.query_selector(selector)
-            return (await el.inner_text()).strip() if el else None
-        except Exception:
-            return None
-
-    async def _safe_get_attr(self, page: Page, selector: str, attr: str) -> Optional[str]:
-        try:
-            el = await page.query_selector(selector)
-            return await el.get_attribute(attr) if el else None
-        except Exception:
-            return None
-
-    def _parse_price(self, raw: Optional[str]) -> Optional[float]:
-        if not raw:
-            return None
-        cleaned = raw.replace("€", "").replace("$", "").replace(",", ".").replace("\xa0", "").strip()
-        try:
-            return float("".join(c for c in cleaned if c.isdigit() or c == "."))
-        except ValueError:
-            return None
