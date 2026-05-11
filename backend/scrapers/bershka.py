@@ -4,7 +4,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 SECTIONS = [
-    ("https://www.bershka.com/es/mujer/nuevo-l1558051.html", "new_arrivals"),
+    ("https://www.bershka.com/es/mujer/novedades-n3283.html", "new_arrivals"),
     ("https://www.bershka.com/es/hombre/nuevo-l1558080.html", "new_arrivals"),
 ]
 

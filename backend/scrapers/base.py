@@ -125,8 +125,16 @@ class BaseScraper(ABC):
     async def scrape(self) -> list[ScrapedProduct]:
         try:
             products = await self._scrape()
-            logger.info(f"[{self.store_name}] scraped {len(products)} products")
-            return products
+            seen: set[str] = set()
+            unique = []
+            for p in products:
+                key = p.name.strip().lower()
+                if key not in seen:
+                    seen.add(key)
+                    unique.append(p)
+            removed = len(products) - len(unique)
+            logger.info(f"[{self.store_name}] scraped {len(unique)} products" + (f" ({removed} dupes removed)" if removed else ""))
+            return unique
         except Exception as e:
             logger.error(f"[{self.store_name}] scrape failed: {e}")
             return []
