@@ -59,11 +59,12 @@ async def fetch_page(url: str, country: str = "es", wait: int = 3000) -> Beautif
 def parse_price(raw: Optional[str]) -> Optional[float]:
     if not raw:
         return None
-    cleaned = re.sub(r"[^\d,.]", "", raw.replace(",", "."))
-    # Take first number-like string
-    match = re.search(r"\d+\.?\d*", cleaned)
+    # Find all price-like numbers (e.g. "98.00 - 118.00" → take first)
+    matches = re.findall(r"\d{1,5}(?:[.,]\d{1,2})?", raw)
+    if not matches:
+        return None
     try:
-        return float(match.group()) if match else None
+        return float(matches[0].replace(",", "."))
     except ValueError:
         return None
 

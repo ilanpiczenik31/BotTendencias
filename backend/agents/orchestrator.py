@@ -89,6 +89,15 @@ async def _scrape_store(run_id: int, store: Store):
         logger.warning(f"No products scraped for {store.name}")
         return
 
+    # Deduplicate by name (case-insensitive) within the same run+store
+    seen_names: set[str] = set()
+    unique_products = []
+    for p in products:
+        key = p.name.strip().lower()
+        if key not in seen_names:
+            seen_names.add(key)
+            unique_products.append(p)
+
     async with AsyncSessionLocal() as session:
         db_products = [
             Product(
@@ -102,11 +111,11 @@ async def _scrape_store(run_id: int, store: Store):
                 category=p.category,
                 section=p.section,
             )
-            for p in products
+            for p in unique_products
         ]
         session.add_all(db_products)
         await session.commit()
-        logger.info(f"Saved {len(db_products)} products for {store.name}")
+        logger.info(f"Saved {len(db_products)} products for {store.name} ({len(products) - len(db_products)} duplicates removed)")
 
 
 async def _analyze_all_stores(run_id: int):
