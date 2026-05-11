@@ -227,11 +227,14 @@ function ProductCard({ product }: { product: Product }) {
       <div className="p-3">
         <p className="text-xs text-neutral-500 mb-0.5">{product.store}</p>
         <p className="text-sm text-neutral-200 line-clamp-2 leading-snug">{product.name}</p>
-        {product.price && (
-          <p className="text-sm font-medium text-white mt-1">
-            {product.price} {product.currency}
-          </p>
-        )}
+        <div className="flex items-center justify-between mt-1">
+          {product.price ? (
+            <p className="text-sm font-medium text-white">{product.price} {product.currency}</p>
+          ) : <span />}
+          {product.product_url && (
+            <span className="text-xs text-neutral-500 group-hover:text-neutral-300 transition-colors">Ver →</span>
+          )}
+        </div>
       </div>
     </a>
   );

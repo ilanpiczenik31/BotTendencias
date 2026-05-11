@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional
 from bs4 import BeautifulSoup, Tag
-import httpx
 import asyncio
+import httpx
 import logging
 import os
 import re
@@ -12,6 +12,9 @@ logger = logging.getLogger(__name__)
 
 SCRAPER_API_KEY = os.getenv("SCRAPER_API_KEY", "")
 SCRAPER_API_BASE = "http://api.scraperapi.com"
+
+# Free tier allows ~5 concurrent requests — use 3 to stay safe
+_semaphore = asyncio.Semaphore(3)
 
 
 @dataclass
@@ -26,7 +29,7 @@ class ScrapedProduct:
 
 
 async def fetch_page(url: str, country: str = "es", wait: int = 3000) -> BeautifulSoup:
-    """Fetch a page through ScraperAPI (residential IPs + JS rendering)."""
+    """Fetch a page through ScraperAPI with concurrency limiting and retry."""
     params = {
         "api_key": SCRAPER_API_KEY,
         "url": url,
@@ -35,10 +38,22 @@ async def fetch_page(url: str, country: str = "es", wait: int = 3000) -> Beautif
         "wait_for_selector": "body",
         "wait": str(wait),
     }
-    async with httpx.AsyncClient(timeout=90) as client:
-        resp = await client.get(SCRAPER_API_BASE, params=params)
-        resp.raise_for_status()
-        return BeautifulSoup(resp.text, "lxml")
+    async with _semaphore:
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=90) as client:
+                    resp = await client.get(SCRAPER_API_BASE, params=params)
+                    if resp.status_code == 429:
+                        await asyncio.sleep(10 * (attempt + 1))
+                        continue
+                    resp.raise_for_status()
+                    return BeautifulSoup(resp.text, "lxml")
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 429 and attempt < 2:
+                    await asyncio.sleep(10 * (attempt + 1))
+                    continue
+                raise
+        raise Exception(f"Failed after 3 attempts: {url}")
 
 
 def parse_price(raw: Optional[str]) -> Optional[float]:
