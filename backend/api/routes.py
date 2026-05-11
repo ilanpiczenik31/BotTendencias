@@ -5,6 +5,7 @@ from models.database import (
     get_session, WeeklyRun, Product, TrendAnalysis, WeeklyReport, Store, RunStatus
 )
 from agents.orchestrator import run_pipeline
+from scrapers.debug import inspect_page
 import asyncio
 
 router = APIRouter()
@@ -218,3 +219,12 @@ async def get_stats(session: AsyncSession = Depends(get_session)):
         "last_run_date": last_run.run_date.isoformat() if last_run else None,
         "last_run_status": last_run.status if last_run else None,
     }
+
+
+# ── Debug ─────────────────────────────────────────────────────────────────────
+
+@router.get("/debug/inspect")
+async def debug_inspect(url: str):
+    """Inspect a page's HTML structure to find correct CSS selectors."""
+    result = await inspect_page(url)
+    return result
