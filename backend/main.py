@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from models.database import init_db, seed_stores
+from models.database import init_db, seed_stores, cleanup_stuck_runs
 from api.routes import router
 from agents.orchestrator import run_pipeline
 import os
@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing database...")
     await init_db()
     await seed_stores()
+    await cleanup_stuck_runs()  # mark any leftover "running" runs as failed
 
     # Schedule weekly run: every Monday at 08:00 UTC
     scheduler.add_job(

@@ -39,6 +39,21 @@ async def list_runs(limit: int = 20, session: AsyncSession = Depends(get_session
     ]
 
 
+@router.post("/runs/{run_id}/cancel")
+async def cancel_run(run_id: int, session: AsyncSession = Depends(get_session)):
+    from datetime import datetime
+    run = await session.get(WeeklyRun, run_id)
+    if not run:
+        raise HTTPException(404, "Run not found")
+    if run.status not in (RunStatus.running, RunStatus.pending):
+        raise HTTPException(400, f"Run is {run.status}, cannot cancel")
+    run.status = RunStatus.failed
+    run.error_message = "Cancelled manually"
+    run.completed_at = datetime.utcnow()
+    await session.commit()
+    return {"message": "Run cancelled"}
+
+
 @router.get("/runs/{run_id}")
 async def get_run(run_id: int, session: AsyncSession = Depends(get_session)):
     run = await session.get(WeeklyRun, run_id)

@@ -127,6 +127,25 @@ async def seed_stores():
         await session.commit()
 
 
+async def cleanup_stuck_runs():
+    """Mark any runs stuck in 'running'/'pending' as failed on startup."""
+    from sqlalchemy import update
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            update(WeeklyRun)
+            .where(WeeklyRun.status.in_([RunStatus.running, RunStatus.pending]))
+            .values(
+                status=RunStatus.failed,
+                error_message="Interrupted — server restarted",
+                completed_at=datetime.utcnow(),
+            )
+        )
+        if result.rowcount:
+            import logging
+            logging.getLogger(__name__).info(f"Cleaned up {result.rowcount} stuck run(s)")
+        await session.commit()
+
+
 async def get_session():
     async with AsyncSessionLocal() as session:
         yield session
