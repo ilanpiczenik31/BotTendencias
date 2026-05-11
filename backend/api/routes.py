@@ -6,18 +6,33 @@ from models.database import (
 )
 from agents.orchestrator import run_pipeline
 from scrapers.debug import inspect_page
+from scrapers.registry import REGISTRY
+from pydantic import BaseModel
 import asyncio
 
 router = APIRouter()
 
 
+class RunConfig(BaseModel):
+    stores: list[dict] | None = None  # [{"store": "Zara", "sections": [...]}]
+
+
 # ── Runs ──────────────────────────────────────────────────────────────────────
 
 @router.post("/runs/trigger")
-async def trigger_run(background_tasks: BackgroundTasks):
-    """Trigger a manual scraping run."""
-    background_tasks.add_task(run_pipeline, "manual")
+async def trigger_run(background_tasks: BackgroundTasks, config: RunConfig = RunConfig()):
+    """Trigger a manual scraping run with optional custom config."""
+    background_tasks.add_task(run_pipeline, "manual", config.stores)
     return {"message": "Run started", "status": "running"}
+
+
+@router.get("/registry")
+async def get_registry():
+    """Return all available stores and their scrapeable sections."""
+    return [
+        {"store": store, "sections": sections}
+        for store, sections in REGISTRY.items()
+    ]
 
 
 @router.get("/runs")

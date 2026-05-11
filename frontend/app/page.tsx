@@ -5,7 +5,8 @@ import { api, Stats, Report, Run } from "@/lib/api";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
-import { Play, RefreshCw, TrendingUp, Package, Store, Clock, ArrowRight, Sparkles, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Play, RefreshCw, TrendingUp, Package, Store, Clock, ArrowRight, Sparkles, CheckCircle, XCircle, Loader2, Settings2 } from "lucide-react";
+import RunConfigModal from "@/components/RunConfigModal";
 
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -13,6 +14,7 @@ export default function Dashboard() {
   const [runs, setRuns] = useState<Run[]>([]);
   const [triggering, setTriggering] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showConfig, setShowConfig] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isRunning = stats?.last_run_status === "running" || stats?.last_run_status === "pending";
@@ -41,10 +43,11 @@ export default function Dashboard() {
 
   useEffect(() => { loadData(); }, []);
 
-  async function handleTrigger() {
+  async function handleTrigger(config?: { store: string; sections: any[] }[] | null) {
+    setShowConfig(false);
     setTriggering(true);
     try {
-      await api.triggerRun();
+      await api.triggerRun(config ?? undefined);
       setTimeout(() => loadData(true), 3000);
     } catch { /* ignore */ }
     finally { setTriggering(false); }
@@ -52,6 +55,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
+      {showConfig && (
+        <RunConfigModal onClose={() => setShowConfig(false)} onTrigger={handleTrigger} />
+      )}
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
@@ -63,7 +69,11 @@ export default function Dashboard() {
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm text-neutral-400 transition-colors disabled:opacity-50">
             <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Actualizar
           </button>
-          <button onClick={handleTrigger} disabled={triggering}
+          <button onClick={() => setShowConfig(true)} disabled={triggering || isRunning}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm text-neutral-300 transition-colors disabled:opacity-50">
+            <Settings2 size={13} /> Configurar
+          </button>
+          <button onClick={() => handleTrigger(null)} disabled={triggering || isRunning}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white hover:bg-neutral-100 text-sm text-neutral-900 font-semibold transition-colors disabled:opacity-60">
             <Play size={13} fill="currentColor" />
             {triggering ? "Iniciando..." : "Correr ahora"}

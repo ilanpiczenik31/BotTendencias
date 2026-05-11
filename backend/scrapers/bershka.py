@@ -1,24 +1,22 @@
 from .base import BaseScraper, ScrapedProduct, fetch_page, extract_json_ld_products
+from .registry import REGISTRY
 import logging
 
 logger = logging.getLogger(__name__)
-
-SECTIONS = [
-    ("https://www.bershka.com/es/mujer/novedades-n3283.html",        "new_arrivals_women"),
-    ("https://www.bershka.com/es/hombre/nuevo-l1558080.html",        "new_arrivals_men"),
-    ("https://www.bershka.com/es/mujer/mas-vendido-n3284.html",      "best_sellers_women"),
-    ("https://www.bershka.com/es/hombre/mas-vendido-n3285.html",     "best_sellers_men"),
-]
 
 
 class BershkaScraper(BaseScraper):
     store_name = "Bershka"
     store_url = "https://www.bershka.com/es/"
 
+    def __init__(self, sections: list[dict] | None = None):
+        self.sections = sections or REGISTRY["Bershka"]
+
     async def _scrape(self) -> list[ScrapedProduct]:
         products: list[ScrapedProduct] = []
 
-        for url, section in SECTIONS:
+        for sec in self.sections:
+            url, section_key = sec["url"], sec["key"]
             try:
                 soup = await fetch_page(url, country="es", wait=5000)
                 items = extract_json_ld_products(soup)
@@ -42,13 +40,13 @@ class BershkaScraper(BaseScraper):
                 for p in items[:30]:
                     if p["name"]:
                         products.append(ScrapedProduct(
-                            name=p["name"], section=section,
+                            name=p["name"], section=section_key,
                             price=p.get("price"), currency=p.get("currency", "EUR"),
                             image_url=p.get("image") or None,
                             product_url=p.get("url") or None,
                             category="ropa",
                         ))
             except Exception as e:
-                logger.error(f"Bershka {url}: {e}")
+                logger.error(f"Bershka [{section_key}] {url}: {e}")
 
         return products

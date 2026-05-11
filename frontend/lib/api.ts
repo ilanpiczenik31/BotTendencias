@@ -65,6 +65,12 @@ export interface Report {
   created_at: string;
 }
 
+export interface Section {
+  key: string;
+  label: string;
+  url: string;
+}
+
 export interface Store {
   id: number;
   name: string;
@@ -82,8 +88,13 @@ export interface Stats {
 }
 
 export const api = {
-  triggerRun: () => apiFetch<{ message: string }>("/api/runs/trigger", { method: "POST" }),
+  triggerRun: (stores?: { store: string; sections: Section[] }[]) =>
+    apiFetch<{ message: string }>("/api/runs/trigger", {
+      method: "POST",
+      body: JSON.stringify({ stores: stores ?? null }),
+    }),
   cancelRun: (id: number) => apiFetch<{ message: string }>(`/api/runs/${id}/cancel`, { method: "POST" }),
+  getRegistry: () => apiFetch<{ store: string; sections: Section[] }[]>("/api/registry"),
   getRuns: (limit = 20) => apiFetch<Run[]>(`/api/runs?limit=${limit}`),
   getRun: (id: number) => apiFetch<Run>(`/api/runs/${id}`),
   getRunProducts: (runId: number, storeId?: number) =>
