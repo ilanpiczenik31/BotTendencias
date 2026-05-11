@@ -1,4 +1,4 @@
-from .base import BaseScraper, ScrapedProduct, fetch_page, parse_price, find_image, find_link
+from .base import BaseScraper, ScrapedProduct, fetch_page, extract_json_ld_products, find_image, find_link
 import logging
 
 logger = logging.getLogger(__name__)
@@ -6,27 +6,6 @@ logger = logging.getLogger(__name__)
 SECTIONS = [
     ("https://www.bershka.com/es/mujer/nuevo-l1558051.html", "new_arrivals"),
     ("https://www.bershka.com/es/hombre/nuevo-l1558080.html", "new_arrivals"),
-]
-
-PRODUCT_SELECTORS = [
-    "li.grid-item",
-    "li[class*='product']",
-    "article[class*='product']",
-    "[class*='grid-card']",
-    "[data-productid]",
-]
-
-NAME_SELECTORS = [
-    "[class*='grid-card-element__title']",
-    "[class*='product-title']",
-    "[class*='product-name']",
-    "h2", "h3",
-]
-
-PRICE_SELECTORS = [
-    "[class*='price-item--regular']",
-    "[class*='current-price']",
-    "[class*='price']",
 ]
 
 
@@ -40,35 +19,34 @@ class BershkaScraper(BaseScraper):
         for url, section in SECTIONS:
             try:
                 soup = await fetch_page(url, country="es", wait=5000)
+                items = extract_json_ld_products(soup)
 
-                items = []
-                for sel in PRODUCT_SELECTORS:
-                    items = soup.select(sel)
-                    if items:
-                        break
+                # Fallback: Bershka is Inditex, same structure as Zara
+                if not items:
+                    for item in soup.select("li.product-grid-product, li[class*='product']")[:30]:
+                        img = item.select_one("img")
+                        alt = img.get("alt", "") if img else ""
+                        name = alt.split(" - ")[0].strip() if " - " in alt else alt.strip()
+                        link = item.select_one("a[href]")
+                        product_url = link["href"] if link else None
+                        if product_url and not product_url.startswith("http"):
+                            product_url = "https://www.bershka.com" + product_url
+                        image_url = img.get("src") if img else None
+                        if image_url and "transparent-background" in (image_url or ""):
+                            image_url = None
+                        if name:
+                            items.append({"name": name, "image": image_url,
+                                          "price": None, "currency": "EUR", "url": product_url or ""})
 
-                for item in items[:30]:
-                    name = None
-                    for sel in NAME_SELECTORS:
-                        el = item.select_one(sel)
-                        if el and el.get_text(strip=True):
-                            name = el.get_text(strip=True)
-                            break
-
-                    price_raw = None
-                    for sel in PRICE_SELECTORS:
-                        el = item.select_one(sel)
-                        if el:
-                            price_raw = el.get_text(strip=True)
-                            break
-
-                    if name:
+                for p in items[:30]:
+                    if p["name"]:
                         products.append(ScrapedProduct(
-                            name=name,
+                            name=p["name"],
                             section=section,
-                            price=parse_price(price_raw),
-                            image_url=find_image(item),
-                            product_url=find_link(item, "https://www.bershka.com"),
+                            price=p.get("price"),
+                            currency=p.get("currency", "EUR"),
+                            image_url=p.get("image") or None,
+                            product_url=p.get("url") or None,
                             category="ropa",
                         ))
             except Exception as e:

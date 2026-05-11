@@ -61,6 +61,36 @@ def find_image(tag: Tag) -> Optional[str]:
     return None
 
 
+def extract_json_ld_products(soup: BeautifulSoup) -> list[dict]:
+    """Extract product list from JSON-LD structured data (schema.org ItemList)."""
+    import json
+    results = []
+    for script in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(script.string or "")
+            if data.get("@type") == "ItemList":
+                for entry in data.get("itemListElement", []):
+                    item = entry.get("item", entry)  # some sites nest, some don't
+                    if item.get("@type") != "Product":
+                        continue
+                    offers = item.get("offers", {})
+                    # image can be string or list
+                    image = item.get("image", "")
+                    if isinstance(image, list):
+                        image = image[0] if image else ""
+                    price = offers.get("price")
+                    results.append({
+                        "name": item.get("name", "").strip(),
+                        "image": image,
+                        "price": float(price) if price is not None else None,
+                        "currency": offers.get("priceCurrency", "EUR"),
+                        "url": offers.get("url") or item.get("url", ""),
+                    })
+        except Exception:
+            pass
+    return results
+
+
 def find_link(tag: Tag, base_url: str) -> Optional[str]:
     a = tag.find("a", href=True)
     if not a:

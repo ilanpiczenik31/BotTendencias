@@ -1,4 +1,4 @@
-from .base import BaseScraper, ScrapedProduct, fetch_page, parse_price, find_image, find_link
+from .base import BaseScraper, ScrapedProduct, fetch_page, extract_json_ld_products
 import logging
 
 logger = logging.getLogger(__name__)
@@ -6,29 +6,6 @@ logger = logging.getLogger(__name__)
 SECTIONS = [
     ("https://www2.hm.com/es_es/mujer/novedades/ver-todo.html", "new_arrivals"),
     ("https://www2.hm.com/es_es/hombre/novedades/ver-todo.html", "new_arrivals"),
-]
-
-PRODUCT_SELECTORS = [
-    "li.product-item",
-    "article.product-item",
-    "li[class*='product']",
-    "[data-articlecode]",
-    "[class*='product-tile']",
-]
-
-NAME_SELECTORS = [
-    "h2.item-heading a",
-    "[class*='item-heading']",
-    "[class*='product-title']",
-    "[class*='product-name']",
-    "h2", "h3",
-]
-
-PRICE_SELECTORS = [
-    "span.price.regular",
-    "[class*='price-value']",
-    "[class*='product-price']",
-    "[class*='price']",
 ]
 
 
@@ -42,39 +19,26 @@ class HMScraper(BaseScraper):
         for url, section in SECTIONS:
             try:
                 soup = await fetch_page(url, country="es", wait=5000)
+                items = extract_json_ld_products(soup)
 
-                items = []
-                for sel in PRODUCT_SELECTORS:
-                    items = soup.select(sel)
-                    if items:
-                        break
+                # Fallback: extract from img alt tags (classes are obfuscated hashes)
+                if not items:
+                    for img in soup.find_all("img", src=lambda s: s and "image.hm.com" in s):
+                        alt = img.get("alt", "").strip()
+                        name = alt.split("-")[0].strip() if "-" in alt else alt
+                        if name:
+                            items.append({"name": name, "image": img["src"],
+                                          "price": None, "currency": "EUR", "url": ""})
 
-                for item in items[:30]:
-                    name = None
-                    for sel in NAME_SELECTORS:
-                        el = item.select_one(sel)
-                        if el and el.get_text(strip=True):
-                            name = el.get_text(strip=True)
-                            break
-
-                    price_raw = None
-                    for sel in PRICE_SELECTORS:
-                        el = item.select_one(sel)
-                        if el:
-                            price_raw = el.get_text(strip=True)
-                            break
-
-                    img = find_image(item)
-                    if img and img.startswith("//"):
-                        img = "https:" + img
-
-                    if name:
+                for p in items[:30]:
+                    if p["name"]:
                         products.append(ScrapedProduct(
-                            name=name,
+                            name=p["name"],
                             section=section,
-                            price=parse_price(price_raw),
-                            image_url=img,
-                            product_url=find_link(item, "https://www2.hm.com"),
+                            price=p.get("price"),
+                            currency=p.get("currency", "EUR"),
+                            image_url=p.get("image") or None,
+                            product_url=p.get("url") or None,
                             category="ropa",
                         ))
             except Exception as e:
