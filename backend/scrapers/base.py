@@ -59,12 +59,15 @@ async def fetch_page(url: str, country: str = "es", wait: int = 3000) -> Beautif
 def parse_price(raw: Optional[str]) -> Optional[float]:
     if not raw:
         return None
-    # Find all price-like numbers (e.g. "98.00 - 118.00" → take first)
-    matches = re.findall(r"\d{1,5}(?:[.,]\d{1,2})?", raw)
-    if not matches:
+    # Split on separators first to avoid joining "98 - 118" → "98118"
+    parts = re.split(r"[-–—/]", raw)
+    first = parts[0].strip()
+    match = re.search(r"\d{1,4}(?:[.,]\d{1,2})?", first)
+    if not match:
         return None
     try:
-        return float(matches[0].replace(",", "."))
+        value = float(match.group().replace(",", "."))
+        return value if value < 9999 else None  # sanity cap
     except ValueError:
         return None
 
@@ -128,9 +131,13 @@ class BaseScraper(ABC):
             seen: set[str] = set()
             unique = []
             for p in products:
-                key = p.name.strip().lower()
+                # Deduplicate by name OR by image_url (catches same product in different sections)
+                name_key = p.name.strip().lower()
+                img_key = (p.image_url or "").split("?")[0]  # strip query params
+                key = img_key if img_key else name_key
                 if key not in seen:
                     seen.add(key)
+                    seen.add(name_key)  # also block same name
                     unique.append(p)
             removed = len(products) - len(unique)
             logger.info(f"[{self.store_name}] scraped {len(unique)} products" + (f" ({removed} dupes removed)" if removed else ""))
