@@ -4,8 +4,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 SECTIONS = [
-    ("https://www.thenorthface.com/en-gb/mens", "new_arrivals"),
-    ("https://www.thenorthface.com/en-gb/womens", "new_arrivals"),
+    ("https://www.thenorthface.com/en-gb/womens",              "new_arrivals_women"),
+    ("https://www.thenorthface.com/en-gb/mens",                "new_arrivals_men"),
+    ("https://www.thenorthface.com/en-gb/womens/best-sellers", "best_sellers_women"),
+    ("https://www.thenorthface.com/en-gb/mens/best-sellers",   "best_sellers_men"),
 ]
 
 PRODUCT_SELECTORS = [
@@ -13,26 +15,15 @@ PRODUCT_SELECTORS = [
     "[class*='product-card']",
     "li[class*='product']",
     "[class*='product-item']",
-    "[data-component='ProductTile']",
 ]
 
-NAME_SELECTORS = [
-    "[class*='product-name']",
-    "[class*='product-title']",
-    "[class*='title-']",
-    "h2", "h3",
-]
-
-PRICE_SELECTORS = [
-    "[class*='price']",
-    "[class*='cost']",
-]
+NAME_SELECTORS = ["[class*='product-name']", "[class*='title-']", "h2", "h3"]
+PRICE_SELECTORS = ["[class*='price']"]
 
 
 class NorthFaceScraper(BaseScraper):
     store_name = "The North Face"
     store_url = "https://www.thenorthface.com/en-gb/"
-    country = "gb"
 
     async def _scrape(self) -> list[ScrapedProduct]:
         products: list[ScrapedProduct] = []
@@ -43,13 +34,11 @@ class NorthFaceScraper(BaseScraper):
                 items_data = extract_json_ld_products(soup)
 
                 if not items_data:
-                    # Try HTML selectors
                     containers = []
                     for sel in PRODUCT_SELECTORS:
                         containers = soup.select(sel)
                         if containers:
                             break
-
                     for item in containers[:25]:
                         name = None
                         for sel in NAME_SELECTORS:
@@ -57,14 +46,12 @@ class NorthFaceScraper(BaseScraper):
                             if el and el.get_text(strip=True):
                                 name = el.get_text(strip=True)
                                 break
-
                         price_raw = None
                         for sel in PRICE_SELECTORS:
                             el = item.select_one(sel)
                             if el:
                                 price_raw = el.get_text(strip=True)
                                 break
-
                         if name:
                             items_data.append({
                                 "name": name,
@@ -77,10 +64,8 @@ class NorthFaceScraper(BaseScraper):
                 for p in items_data[:25]:
                     if p["name"]:
                         products.append(ScrapedProduct(
-                            name=p["name"],
-                            section=section,
-                            price=p.get("price"),
-                            currency=p.get("currency", "GBP"),
+                            name=p["name"], section=section,
+                            price=p.get("price"), currency=p.get("currency", "GBP"),
                             image_url=p.get("image") or None,
                             product_url=p.get("url") or None,
                             category="ropa",

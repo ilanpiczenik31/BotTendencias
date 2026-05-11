@@ -4,13 +4,32 @@ import { useEffect, useState } from "react";
 import { api, Run, TrendAnalysis, Product, Store } from "@/lib/api";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import Image from "next/image";
+import { ExternalLink } from "lucide-react";
+
+const SECTION_LABELS: Record<string, string> = {
+  new_arrivals_women: "Nuevos · Mujer",
+  new_arrivals_men:   "Nuevos · Hombre",
+  best_sellers_women: "Más vendidos · Mujer",
+  best_sellers_men:   "Más vendidos · Hombre",
+  new_arrivals:       "Novedades",
+  best_sellers:       "Más vendidos",
+  trending:           "Trending",
+};
+
+const SECTION_FILTERS = [
+  { value: "",                    label: "Todo" },
+  { value: "new_arrivals_women",  label: "Nuevos · Mujer" },
+  { value: "new_arrivals_men",    label: "Nuevos · Hombre" },
+  { value: "best_sellers_women",  label: "Más vendidos · Mujer" },
+  { value: "best_sellers_men",    label: "Más vendidos · Hombre" },
+];
 
 export default function TrendsPage() {
   const [runs, setRuns] = useState<Run[]>([]);
   const [selectedRun, setSelectedRun] = useState<Run | null>(null);
   const [stores, setStores] = useState<Store[]>([]);
   const [selectedStore, setSelectedStore] = useState<number | null>(null);
+  const [selectedSection, setSelectedSection] = useState("");
   const [analyses, setAnalyses] = useState<TrendAnalysis[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingData, setLoadingData] = useState(false);
@@ -19,7 +38,7 @@ export default function TrendsPage() {
     Promise.all([api.getRuns(10), api.getStores()]).then(([rs, ss]) => {
       setRuns(rs);
       setStores(ss);
-      const completed = rs.find((r) => r.status === "completed");
+      const completed = rs.find(r => r.status === "completed");
       if (completed) setSelectedRun(completed);
     });
   }, []);
@@ -30,100 +49,114 @@ export default function TrendsPage() {
     Promise.all([
       api.getRunAnalyses(selectedRun.id),
       api.getRunProducts(selectedRun.id, selectedStore ?? undefined),
-    ]).then(([a, p]) => {
-      setAnalyses(a);
-      setProducts(p);
-    }).finally(() => setLoadingData(false));
+    ]).then(([a, p]) => { setAnalyses(a); setProducts(p); })
+      .finally(() => setLoadingData(false));
   }, [selectedRun, selectedStore]);
 
-  const filteredAnalysis = selectedStore
-    ? analyses.find((a) => a.store_id === selectedStore) ?? null
+  const filteredProducts = selectedSection
+    ? products.filter(p => p.section === selectedSection)
+    : products;
+
+  const analysis = selectedStore
+    ? analyses.find(a => a.store_id === selectedStore)
     : null;
 
-  const displayProducts = products.slice(0, 60);
+  // Count products per section for the badges
+  const sectionCounts = products.reduce((acc, p) => {
+    acc[p.section] = (acc[p.section] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-white">Tendencias por tienda</h1>
-        <p className="text-neutral-400 mt-1">Explorá los productos y análisis de cada corrida.</p>
+        <h1 className="text-2xl font-bold text-white">Tendencias</h1>
+        <p className="text-neutral-500 mt-0.5 text-sm">Productos y análisis de cada tienda.</p>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3">
+      {/* Run selector */}
+      <div className="flex items-center gap-3 flex-wrap">
         <select
           value={selectedRun?.id ?? ""}
-          onChange={(e) => {
-            const run = runs.find((r) => r.id === Number(e.target.value));
-            setSelectedRun(run ?? null);
-          }}
-          className="bg-neutral-800 border border-neutral-700 text-neutral-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-neutral-500"
+          onChange={e => setSelectedRun(runs.find(r => r.id === Number(e.target.value)) ?? null)}
+          className="bg-neutral-800 border border-neutral-700/60 text-neutral-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-neutral-500"
         >
-          {runs.filter((r) => r.status === "completed").map((r) => (
+          {runs.filter(r => r.status === "completed").map(r => (
             <option key={r.id} value={r.id}>
-              {format(new Date(r.run_date), "dd MMM yyyy", { locale: es })}
+              {format(new Date(r.run_date), "dd MMM yyyy · HH:mm", { locale: es })}
             </option>
           ))}
         </select>
+        {selectedRun && (
+          <span className="text-xs text-neutral-600">
+            {products.length} productos scrapeados
+          </span>
+        )}
+      </div>
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setSelectedStore(null)}
-            className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-              !selectedStore ? "bg-white text-neutral-900 font-medium" : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
+      {/* Store tabs */}
+      <div className="flex flex-wrap gap-2">
+        <FilterTab active={!selectedStore} onClick={() => setSelectedStore(null)}>Todas las tiendas</FilterTab>
+        {stores.map(s => (
+          <FilterTab key={s.id} active={selectedStore === s.id} onClick={() => setSelectedStore(selectedStore === s.id ? null : s.id)}>
+            {s.name}
+          </FilterTab>
+        ))}
+      </div>
+
+      {/* Section filter */}
+      <div className="flex flex-wrap gap-2">
+        {SECTION_FILTERS.map(f => (
+          <button key={f.value}
+            onClick={() => setSelectedSection(selectedSection === f.value ? "" : f.value)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              selectedSection === f.value
+                ? "bg-neutral-200 text-neutral-900"
+                : "bg-neutral-800/60 text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800"
             }`}
           >
-            Todas
+            {f.label}
+            {f.value && sectionCounts[f.value] ? (
+              <span className={`text-xs rounded-full px-1.5 py-0.5 ${selectedSection === f.value ? "bg-neutral-400 text-neutral-900" : "bg-neutral-700 text-neutral-400"}`}>
+                {sectionCounts[f.value]}
+              </span>
+            ) : null}
           </button>
-          {stores.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => setSelectedStore(s.id === selectedStore ? null : s.id)}
-              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                selectedStore === s.id ? "bg-white text-neutral-900 font-medium" : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
-              }`}
-            >
-              {s.name}
-            </button>
-          ))}
-        </div>
+        ))}
       </div>
 
       {loadingData ? (
-        <div className="text-center py-20 text-neutral-500 text-sm">Cargando...</div>
+        <div className="text-center py-24 text-neutral-700 text-sm">Cargando...</div>
       ) : (
         <>
-          {/* Analyses grid */}
-          {!selectedStore ? (
-            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {analyses.map((a) => (
-                <AnalysisCard key={a.store} analysis={a} onClick={() => {
-                  const s = stores.find((st) => st.name === a.store);
-                  if (s) setSelectedStore(s.id);
-                }} />
+          {/* Analysis for selected store */}
+          {analysis && <AnalysisCard analysis={analysis} />}
+
+          {/* All analyses grid when no store selected */}
+          {!selectedStore && analyses.length > 0 && (
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {analyses.map(a => (
+                <StoreAnalysisMini key={a.store} analysis={a}
+                  onClick={() => setSelectedStore(stores.find(s => s.name === a.store)?.id ?? null)} />
               ))}
             </div>
-          ) : (
-            filteredAnalysis && <AnalysisDetail analysis={filteredAnalysis} />
           )}
 
-          {/* Products grid */}
-          {displayProducts.length > 0 && (
+          {/* Products */}
+          {filteredProducts.length > 0 && (
             <div>
-              <h2 className="text-base font-semibold text-white mb-4">
-                Productos ({products.length})
+              <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wide mb-4">
+                Productos ({filteredProducts.length})
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
-                {displayProducts.map((p) => (
-                  <ProductCard key={p.id} product={p} />
-                ))}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+                {filteredProducts.slice(0, 100).map(p => <ProductCard key={p.id} product={p} />)}
               </div>
             </div>
           )}
 
-          {!selectedRun && (
-            <div className="text-center py-20 text-neutral-500 text-sm">
-              No hay corridas completadas todavía.
+          {filteredProducts.length === 0 && !loadingData && selectedRun && (
+            <div className="text-center py-20 text-neutral-700 text-sm">
+              No hay productos para esta selección.
             </div>
           )}
         </>
@@ -132,24 +165,34 @@ export default function TrendsPage() {
   );
 }
 
-function AnalysisCard({ analysis, onClick }: { analysis: TrendAnalysis; onClick: () => void }) {
-  const score = analysis.trends.trend_score ?? 0;
+function FilterTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button
-      onClick={onClick}
-      className="text-left rounded-xl border border-neutral-800 bg-neutral-900 p-4 hover:border-neutral-600 transition-colors space-y-3"
-    >
+    <button onClick={onClick}
+      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+        active ? "bg-white text-neutral-900" : "bg-neutral-900 border border-neutral-800/60 text-neutral-500 hover:text-neutral-200 hover:border-neutral-700"
+      }`}>
+      {children}
+    </button>
+  );
+}
+
+function StoreAnalysisMini({ analysis, onClick }: { analysis: TrendAnalysis; onClick: () => void }) {
+  return (
+    <button onClick={onClick}
+      className="text-left rounded-xl border border-neutral-800/60 bg-neutral-900/50 p-4 hover:border-neutral-600 transition-all hover:bg-neutral-900 space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-white">{analysis.store}</h3>
-        <span className="text-xs bg-neutral-800 text-neutral-400 px-2 py-0.5 rounded-full">
-          Score {score}/10
-        </span>
+        <h3 className="font-semibold text-white text-sm">{analysis.store}</h3>
+        {analysis.trends.trend_score != null && (
+          <span className="text-xs bg-neutral-800 text-neutral-400 px-2 py-0.5 rounded-full">
+            {analysis.trends.trend_score}/10
+          </span>
+        )}
       </div>
-      <p className="text-xs text-neutral-400 leading-relaxed line-clamp-3">{analysis.summary}</p>
-      {analysis.trends.colors && analysis.trends.colors.length > 0 && (
+      <p className="text-xs text-neutral-500 leading-relaxed line-clamp-2">{analysis.summary}</p>
+      {analysis.trends.colors && (
         <div className="flex flex-wrap gap-1">
           {analysis.trends.colors.slice(0, 4).map((c, i) => (
-            <span key={i} className="text-xs bg-pink-950 text-pink-300 px-2 py-0.5 rounded-full">{c}</span>
+            <span key={i} className="text-xs bg-pink-950/60 text-pink-400 px-1.5 py-0.5 rounded-full">{c}</span>
           ))}
         </div>
       )}
@@ -157,83 +200,84 @@ function AnalysisCard({ analysis, onClick }: { analysis: TrendAnalysis; onClick:
   );
 }
 
-function AnalysisDetail({ analysis }: { analysis: TrendAnalysis }) {
+function AnalysisCard({ analysis }: { analysis: TrendAnalysis }) {
   return (
-    <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-6 space-y-4">
+    <div className="rounded-xl border border-neutral-800/60 bg-neutral-900/50 p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-white">{analysis.store}</h2>
-        <span className="text-sm bg-neutral-800 text-neutral-300 px-3 py-1 rounded-full">
-          Trend score: {analysis.trends.trend_score ?? "N/A"}/10
-        </span>
+        <h2 className="text-lg font-bold text-white">{analysis.store}</h2>
+        {analysis.trends.trend_score != null && (
+          <span className="text-sm bg-neutral-800 text-neutral-300 px-3 py-1 rounded-full">
+            Trend score: {analysis.trends.trend_score}/10
+          </span>
+        )}
       </div>
-      <p className="text-neutral-300 text-sm leading-relaxed">{analysis.summary}</p>
-      <div className="grid sm:grid-cols-2 gap-4">
-        <TagGroup title="Colores" tags={analysis.trends.colors} colorClass="bg-pink-950 text-pink-300" />
-        <TagGroup title="Estilos" tags={analysis.trends.styles} colorClass="bg-purple-950 text-purple-300" />
-        <TagGroup title="Categorías" tags={analysis.trends.categories} colorClass="bg-blue-950 text-blue-300" />
-        <TagGroup title="Keywords" tags={analysis.trends.keywords} colorClass="bg-emerald-950 text-emerald-300" />
+      <p className="text-neutral-400 text-sm leading-relaxed">{analysis.summary}</p>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <PillGroup title="Colores" tags={analysis.trends.colors} cls="bg-pink-950/60 text-pink-400" />
+        <PillGroup title="Estilos" tags={analysis.trends.styles} cls="bg-purple-950/60 text-purple-400" />
+        <PillGroup title="Categorías" tags={analysis.trends.categories} cls="bg-blue-950/60 text-blue-400" />
+        <PillGroup title="Keywords" tags={analysis.trends.keywords} cls="bg-emerald-950/60 text-emerald-400" />
       </div>
-      {analysis.trends.price_range && (
-        <div className="rounded-lg bg-neutral-800 px-4 py-3 text-sm">
-          <span className="text-neutral-400">Rango de precio: </span>
-          <span className="text-white font-medium">
+      {analysis.trends.price_range?.average && (
+        <div className="text-xs text-neutral-600">
+          Precio promedio: <span className="text-neutral-400 font-medium">
             {analysis.trends.price_range.min} – {analysis.trends.price_range.max} {analysis.trends.price_range.currency}
           </span>
-          {analysis.trends.price_range.average && (
-            <span className="text-neutral-400"> (promedio: {analysis.trends.price_range.average})</span>
-          )}
         </div>
       )}
     </div>
   );
 }
 
-function TagGroup({ title, tags, colorClass }: { title: string; tags?: string[]; colorClass: string }) {
+function PillGroup({ title, tags, cls }: { title: string; tags?: string[]; cls: string }) {
   if (!tags?.length) return null;
   return (
     <div>
-      <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">{title}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {tags.map((t, i) => (
-          <span key={i} className={`text-xs px-2 py-0.5 rounded-full font-medium ${colorClass}`}>{t}</span>
-        ))}
+      <p className="text-xs font-semibold text-neutral-600 uppercase tracking-widest mb-2">{title}</p>
+      <div className="flex flex-wrap gap-1">
+        {tags.map((t, i) => <span key={i} className={`text-xs px-2 py-0.5 rounded-full font-medium ${cls}`}>{t}</span>)}
       </div>
     </div>
   );
 }
 
 function ProductCard({ product }: { product: Product }) {
+  const sectionLabel = SECTION_LABELS[product.section] ?? product.section;
+  const isWomen = product.section.includes("women");
+  const isBestSeller = product.section.includes("best_seller");
+
   return (
-    <a
-      href={product.product_url ?? "#"}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group rounded-xl overflow-hidden border border-neutral-800 bg-neutral-900 hover:border-neutral-600 transition-colors"
-    >
+    <a href={product.product_url ?? "#"} target="_blank" rel="noopener noreferrer"
+      className="group rounded-xl overflow-hidden border border-neutral-800/60 bg-neutral-900/50 hover:border-neutral-600 hover:bg-neutral-900 transition-all">
       <div className="aspect-[3/4] bg-neutral-800 relative overflow-hidden">
         {product.image_url ? (
-          <img
-            src={product.image_url}
-            alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
+          <img src={product.image_url} alt={product.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-neutral-600 text-2xl">👗</div>
+          <div className="w-full h-full flex items-center justify-center text-neutral-700 text-3xl">👗</div>
         )}
-        <span className="absolute top-2 left-2 text-xs bg-black/70 text-neutral-300 px-2 py-0.5 rounded-full">
-          {product.section === "new_arrivals" ? "Nuevo" : product.section === "best_sellers" ? "Best seller" : "Trending"}
-        </span>
+        <div className="absolute top-2 left-2 flex flex-col gap-1">
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium backdrop-blur-sm ${
+            isBestSeller ? "bg-amber-900/80 text-amber-300" : "bg-black/60 text-neutral-300"
+          }`}>
+            {isBestSeller ? "⭐ Best seller" : isWomen ? "Mujer" : "Hombre"}
+          </span>
+        </div>
+        {product.product_url && (
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <span className="flex items-center gap-1.5 bg-white text-neutral-900 text-xs font-semibold px-3 py-1.5 rounded-full">
+              <ExternalLink size={11} /> Ver producto
+            </span>
+          </div>
+        )}
       </div>
-      <div className="p-3">
-        <p className="text-xs text-neutral-500 mb-0.5">{product.store}</p>
-        <p className="text-sm text-neutral-200 line-clamp-2 leading-snug">{product.name}</p>
-        <div className="flex items-center justify-between mt-1">
+      <div className="p-3 space-y-1">
+        <p className="text-xs text-neutral-600">{product.store}</p>
+        <p className="text-sm text-neutral-200 line-clamp-2 leading-snug font-medium">{product.name}</p>
+        <div className="flex items-center justify-between pt-0.5">
           {product.price ? (
-            <p className="text-sm font-medium text-white">{product.price} {product.currency}</p>
+            <p className="text-sm font-bold text-white">{product.price} <span className="font-normal text-neutral-500">{product.currency}</span></p>
           ) : <span />}
-          {product.product_url && (
-            <span className="text-xs text-neutral-500 group-hover:text-neutral-300 transition-colors">Ver →</span>
-          )}
         </div>
       </div>
     </a>

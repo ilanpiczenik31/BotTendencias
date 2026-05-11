@@ -1,11 +1,13 @@
-from .base import BaseScraper, ScrapedProduct, fetch_page, extract_json_ld_products, find_image, find_link
+from .base import BaseScraper, ScrapedProduct, fetch_page, extract_json_ld_products
 import logging
 
 logger = logging.getLogger(__name__)
 
 SECTIONS = [
-    ("https://www.bershka.com/es/mujer/novedades-n3283.html", "new_arrivals"),
-    ("https://www.bershka.com/es/hombre/nuevo-l1558080.html", "new_arrivals"),
+    ("https://www.bershka.com/es/mujer/novedades-n3283.html",        "new_arrivals_women"),
+    ("https://www.bershka.com/es/hombre/nuevo-l1558080.html",        "new_arrivals_men"),
+    ("https://www.bershka.com/es/mujer/mas-vendido-n3284.html",      "best_sellers_women"),
+    ("https://www.bershka.com/es/hombre/mas-vendido-n3285.html",     "best_sellers_men"),
 ]
 
 
@@ -21,7 +23,6 @@ class BershkaScraper(BaseScraper):
                 soup = await fetch_page(url, country="es", wait=5000)
                 items = extract_json_ld_products(soup)
 
-                # Fallback: Bershka is Inditex, same structure as Zara
                 if not items:
                     for item in soup.select("li.product-grid-product, li[class*='product']")[:30]:
                         img = item.select_one("img")
@@ -41,10 +42,8 @@ class BershkaScraper(BaseScraper):
                 for p in items[:30]:
                     if p["name"]:
                         products.append(ScrapedProduct(
-                            name=p["name"],
-                            section=section,
-                            price=p.get("price"),
-                            currency=p.get("currency", "EUR"),
+                            name=p["name"], section=section,
+                            price=p.get("price"), currency=p.get("currency", "EUR"),
                             image_url=p.get("image") or None,
                             product_url=p.get("url") or None,
                             category="ropa",

@@ -4,8 +4,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 SECTIONS = [
-    ("https://www2.hm.com/es_es/mujer/novedades/ver-todo.html", "new_arrivals"),
-    ("https://www2.hm.com/es_es/hombre/novedades/ver-todo.html", "new_arrivals"),
+    ("https://www2.hm.com/es_es/mujer/novedades/ver-todo.html",       "new_arrivals_women"),
+    ("https://www2.hm.com/es_es/hombre/novedades/ver-todo.html",      "new_arrivals_men"),
+    ("https://www2.hm.com/es_es/mujer/mejores-ventas/ver-todo.html",  "best_sellers_women"),
+    ("https://www2.hm.com/es_es/hombre/mejores-ventas/ver-todo.html", "best_sellers_men"),
 ]
 
 
@@ -21,7 +23,6 @@ class HMScraper(BaseScraper):
                 soup = await fetch_page(url, country="es", wait=5000)
                 items = extract_json_ld_products(soup)
 
-                # Fallback: extract from img alt tags (classes are obfuscated hashes)
                 if not items:
                     for img in soup.find_all("img", src=lambda s: s and "image.hm.com" in s):
                         alt = img.get("alt", "").strip()
@@ -33,10 +34,8 @@ class HMScraper(BaseScraper):
                 for p in items[:30]:
                     if p["name"]:
                         products.append(ScrapedProduct(
-                            name=p["name"],
-                            section=section,
-                            price=p.get("price"),
-                            currency=p.get("currency", "EUR"),
+                            name=p["name"], section=section,
+                            price=p.get("price"), currency=p.get("currency", "EUR"),
                             image_url=p.get("image") or None,
                             product_url=p.get("url") or None,
                             category="ropa",

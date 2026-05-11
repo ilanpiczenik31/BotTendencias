@@ -3,32 +3,17 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Using main category pages since /novedades/ returns 500
 SECTIONS = [
-    ("https://www.springfield.com/es/hombre/", "new_arrivals"),
-    ("https://www.springfield.com/es/mujer/", "new_arrivals"),
+    ("https://www.springfield.com/es/mujer/", "new_arrivals_women"),
+    ("https://www.springfield.com/es/hombre/", "new_arrivals_men"),
 ]
 
 PRODUCT_SELECTORS = [
-    "[class*='product-grid__item']",
-    "[class*='product-item']",
-    "[class*='product-card']",
-    "li[class*='product']",
-    "article[class*='product']",
+    "[class*='product-grid__item']", "[class*='product-item']",
+    "[class*='product-card']", "li[class*='product']", "article[class*='product']",
 ]
-
-NAME_SELECTORS = [
-    "[class*='product-item__name']",
-    "[class*='product-name']",
-    "[class*='product-title']",
-    "h2", "h3",
-]
-
-PRICE_SELECTORS = [
-    "[class*='product-item__price']",
-    "[class*='price-current']",
-    "[class*='price']",
-]
+NAME_SELECTORS = ["[class*='product-name']", "[class*='product-title']", "h2", "h3"]
+PRICE_SELECTORS = ["[class*='price-current']", "[class*='price']"]
 
 
 class SpringfieldScraper(BaseScraper):
@@ -49,7 +34,6 @@ class SpringfieldScraper(BaseScraper):
                         containers = soup.select(sel)
                         if containers:
                             break
-
                     for item in containers[:30]:
                         name = None
                         for sel in NAME_SELECTORS:
@@ -57,30 +41,24 @@ class SpringfieldScraper(BaseScraper):
                             if el and el.get_text(strip=True):
                                 name = el.get_text(strip=True)
                                 break
-
                         price_raw = None
                         for sel in PRICE_SELECTORS:
                             el = item.select_one(sel)
                             if el:
                                 price_raw = el.get_text(strip=True)
                                 break
-
                         if name:
                             items_data.append({
-                                "name": name,
-                                "image": find_image(item),
-                                "price": parse_price(price_raw),
-                                "currency": "EUR",
+                                "name": name, "image": find_image(item),
+                                "price": parse_price(price_raw), "currency": "EUR",
                                 "url": find_link(item, "https://www.springfield.com") or url,
                             })
 
                 for p in items_data[:30]:
                     if p["name"]:
                         products.append(ScrapedProduct(
-                            name=p["name"],
-                            section=section,
-                            price=p.get("price"),
-                            currency="EUR",
+                            name=p["name"], section=section,
+                            price=p.get("price"), currency="EUR",
                             image_url=p.get("image") or None,
                             product_url=p.get("url") or None,
                             category="ropa",

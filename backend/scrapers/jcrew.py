@@ -4,8 +4,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 SECTIONS = [
-    ("https://www.jcrew.com/plp/womens/features/new-arrivals", "new_arrivals"),
-    ("https://www.jcrew.com/plp/mens/features/new-arrivals", "new_arrivals"),
+    ("https://www.jcrew.com/plp/womens/features/new-arrivals",   "new_arrivals_women"),
+    ("https://www.jcrew.com/plp/mens/features/new-arrivals",     "new_arrivals_men"),
+    ("https://www.jcrew.com/plp/womens/features/best-sellers",   "best_sellers_women"),
+    ("https://www.jcrew.com/plp/mens/features/best-sellers",     "best_sellers_men"),
 ]
 
 PRODUCT_SELECTORS = [
@@ -20,7 +22,6 @@ NAME_SELECTORS = [
     "[class*='product-name']",
     "[data-test='product-name']",
     "[class*='product-title']",
-    "[class*='title']",
     "h2", "h3",
 ]
 
@@ -48,7 +49,6 @@ class JCrewScraper(BaseScraper):
                         containers = soup.select(sel)
                         if containers:
                             break
-
                     for item in containers[:30]:
                         name = None
                         for sel in NAME_SELECTORS:
@@ -56,14 +56,12 @@ class JCrewScraper(BaseScraper):
                             if el and el.get_text(strip=True):
                                 name = el.get_text(strip=True)
                                 break
-
                         price_raw = None
                         for sel in PRICE_SELECTORS:
                             el = item.select_one(sel)
                             if el:
                                 price_raw = el.get_text(strip=True)
                                 break
-
                         if name:
                             items_data.append({
                                 "name": name,
@@ -76,10 +74,8 @@ class JCrewScraper(BaseScraper):
                 for p in items_data[:30]:
                     if p["name"]:
                         products.append(ScrapedProduct(
-                            name=p["name"],
-                            section=section,
-                            price=p.get("price"),
-                            currency="USD",
+                            name=p["name"], section=section,
+                            price=p.get("price"), currency="USD",
                             image_url=p.get("image") or None,
                             product_url=p.get("url") or None,
                             category="ropa",

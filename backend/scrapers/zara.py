@@ -5,8 +5,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 SECTIONS = [
-    ("https://www.zara.com/es/es/mujer-nuevo-l1180.html", "new_arrivals"),
-    ("https://www.zara.com/es/es/hombre-nuevo-l837.html", "new_arrivals"),
+    ("https://www.zara.com/es/es/mujer-nuevo-l1180.html",        "new_arrivals_women"),
+    ("https://www.zara.com/es/es/hombre-nuevo-l837.html",        "new_arrivals_men"),
+    ("https://www.zara.com/es/es/mujer-mas-vendidos-l1319.html", "best_sellers_women"),
+    ("https://www.zara.com/es/es/hombre-mas-vendidos-l845.html", "best_sellers_men"),
 ]
 
 
@@ -44,9 +46,8 @@ class ZaraScraper(BaseScraper):
         for url, section in SECTIONS:
             try:
                 soup = await fetch_page(url, country="es", wait=5000)
-
-                # Primary: JSON-LD structured data
                 json_items = _extract_json_ld(soup)
+
                 if json_items:
                     for p in json_items:
                         if p["name"]:
@@ -61,31 +62,22 @@ class ZaraScraper(BaseScraper):
                             ))
                     continue
 
-                # Fallback: HTML selectors using known structure
                 for item in soup.select("li.product-grid-product")[:30]:
                     img = item.select_one("img.media-image__image")
                     name = None
                     if img:
                         alt = img.get("alt", "")
-                        # alt format: "PRODUCT NAME - Color de Zara"
                         name = alt.split(" - ")[0].strip() if " - " in alt else alt.strip()
-
                     link = item.select_one("a.product-link")
                     product_url = link.get("href") if link else None
-
                     image_url = img.get("src") if img else None
                     if image_url and "transparent-background" in image_url:
                         image_url = None
-
                     if name:
                         products.append(ScrapedProduct(
-                            name=name,
-                            section=section,
-                            image_url=image_url,
-                            product_url=product_url,
-                            category="ropa",
+                            name=name, section=section,
+                            image_url=image_url, product_url=product_url, category="ropa",
                         ))
-
             except Exception as e:
                 logger.error(f"Zara {url}: {e}")
 

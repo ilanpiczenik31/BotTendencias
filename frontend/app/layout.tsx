@@ -13,11 +13,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
-      <body className={`${inter.className} bg-neutral-950 text-neutral-100 min-h-screen`}>
-        <nav className="border-b border-neutral-800 bg-neutral-900/80 backdrop-blur sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-2">
-            <Link href="/" className="font-bold text-white tracking-tight text-lg flex items-center gap-2 mr-4">
-              <span>👗</span> TrendEuropa
+      <body className={`${inter.className} bg-[#0a0a0a] text-neutral-100 min-h-screen`}>
+        <nav className="border-b border-white/5 bg-black/60 backdrop-blur-xl sticky top-0 z-50">
+          <div className="max-w-6xl mx-auto px-5 h-13 flex items-center gap-1">
+            <Link href="/" className="font-bold text-white text-sm flex items-center gap-2 mr-5">
+              <span className="text-base">👗</span>
+              <span className="tracking-tight">TrendEuropa</span>
             </Link>
             <NavLink href="/">Dashboard</NavLink>
             <NavLink href="/trends">Tendencias</NavLink>
@@ -25,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <NavLink href="/runs">Corridas</NavLink>
           </div>
         </nav>
-        <main className="max-w-7xl mx-auto px-4 py-8">{children}</main>
+        <main className="max-w-6xl mx-auto px-5 py-8">{children}</main>
       </body>
     </html>
   );
@@ -33,10 +34,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link
-      href={href}
-      className="px-3 py-1.5 rounded-md text-sm text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
-    >
+    <Link href={href}
+      className="px-3 py-1.5 rounded-md text-sm text-neutral-500 hover:text-white hover:bg-white/5 transition-colors">
       {children}
     </Link>
   );
