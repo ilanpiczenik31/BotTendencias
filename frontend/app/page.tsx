@@ -1,22 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, Stats, Report, Run } from "@/lib/api";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
-import { Play, RefreshCw, TrendingUp, Package, Store, Clock, ArrowRight, Sparkles } from "lucide-react";
+import { Play, RefreshCw, TrendingUp, Package, Store, Clock, ArrowRight, Sparkles, CheckCircle, XCircle, Loader2 } from "lucide-react";
 
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [runs, setRuns] = useState<Run[]>([]);
   const [triggering, setTriggering] = useState(false);
-  const [triggerMsg, setTriggerMsg] = useState("");
   const [loading, setLoading] = useState(true);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  async function loadData() {
-    setLoading(true);
+  const isRunning = stats?.last_run_status === "running" || stats?.last_run_status === "pending";
+
+  async function loadData(silent = false) {
+    if (!silent) setLoading(true);
     try {
       const [s, r, rs] = await Promise.allSettled([
         api.getStats(), api.getLatestReport(), api.getRuns(5),
@@ -24,18 +26,27 @@ export default function Dashboard() {
       if (s.status === "fulfilled") setStats(s.value);
       if (r.status === "fulfilled") setReport(r.value);
       if (rs.status === "fulfilled") setRuns(rs.value);
-    } finally { setLoading(false); }
+    } finally { if (!silent) setLoading(false); }
   }
+
+  // Auto-poll every 10s while a run is active
+  useEffect(() => {
+    if (isRunning) {
+      pollRef.current = setInterval(() => loadData(true), 10000);
+    } else {
+      if (pollRef.current) clearInterval(pollRef.current);
+    }
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [isRunning]);
 
   useEffect(() => { loadData(); }, []);
 
   async function handleTrigger() {
-    setTriggering(true); setTriggerMsg("");
+    setTriggering(true);
     try {
       await api.triggerRun();
-      setTriggerMsg("Corrida iniciada. Puede tardar varios minutos...");
-      setTimeout(loadData, 8000);
-    } catch { setTriggerMsg("Error al iniciar la corrida."); }
+      setTimeout(() => loadData(true), 3000);
+    } catch { /* ignore */ }
     finally { setTriggering(false); }
   }
 
@@ -48,7 +59,7 @@ export default function Dashboard() {
           <p className="text-neutral-500 mt-0.5 text-sm">Tendencias de moda europea, actualizadas cada lunes.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={loadData} disabled={loading}
+          <button onClick={() => loadData()} disabled={loading}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm text-neutral-400 transition-colors disabled:opacity-50">
             <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Actualizar
           </button>
@@ -60,9 +71,28 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {triggerMsg && (
-        <div className="rounded-lg bg-blue-950/60 border border-blue-800/50 px-4 py-3 text-sm text-blue-300">
-          {triggerMsg}
+      {/* Run status banner */}
+      {isRunning && (
+        <div className="rounded-lg bg-blue-950/50 border border-blue-800/40 px-4 py-3 flex items-center gap-3">
+          <Loader2 size={15} className="animate-spin text-blue-400 shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm text-blue-300 font-medium">Corrida en progreso...</p>
+            <p className="text-xs text-blue-600 mt-0.5">Scrapeando las 8 tiendas. Esta página se actualiza sola cada 10 segundos.</p>
+          </div>
+        </div>
+      )}
+      {!isRunning && stats?.last_run_status === "completed" && runs[0]?.status === "completed" && (
+        <div className="rounded-lg bg-emerald-950/40 border border-emerald-800/30 px-4 py-3 flex items-center gap-3">
+          <CheckCircle size={15} className="text-emerald-500 shrink-0" />
+          <p className="text-sm text-emerald-400">
+            Última corrida completada — {stats.last_run_date ? format(new Date(stats.last_run_date), "dd MMM · HH:mm", { locale: es }) : ""}
+          </p>
+        </div>
+      )}
+      {!isRunning && stats?.last_run_status === "failed" && (
+        <div className="rounded-lg bg-red-950/40 border border-red-800/30 px-4 py-3 flex items-center gap-3">
+          <XCircle size={15} className="text-red-500 shrink-0" />
+          <p className="text-sm text-red-400">La última corrida falló. Revisá los logs en Railway o volvé a correr.</p>
         </div>
       )}
 
