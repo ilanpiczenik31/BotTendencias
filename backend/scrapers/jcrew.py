@@ -4,8 +4,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 SECTIONS = [
-    ("https://www.jcrew.com/c/womens_clothing/new_arrivals", "new_arrivals"),
-    ("https://www.jcrew.com/c/mens_clothing/new_arrivals", "new_arrivals"),
+    ("https://www.jcrew.com/plp/womens/features/new-arrivals", "new_arrivals"),
+    ("https://www.jcrew.com/plp/mens/features/new-arrivals", "new_arrivals"),
 ]
 
 PRODUCT_SELECTORS = [

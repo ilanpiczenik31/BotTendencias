@@ -4,9 +4,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 SECTIONS = [
-    ("https://www.the-sting.com/en/new", "new_arrivals"),
-    ("https://www.the-sting.com/en/women", "new_arrivals"),
-    ("https://www.the-sting.com/en/men", "new_arrivals"),
+    ("https://www.thesting.com/nl-nl/dames", "new_arrivals"),
+    ("https://www.thesting.com/nl-nl/heren", "new_arrivals"),
 ]
 
 PRODUCT_SELECTORS = [
@@ -69,7 +68,7 @@ class TheStingScraper(BaseScraper):
                                 "image": find_image(item),
                                 "price": parse_price(price_raw),
                                 "currency": "EUR",
-                                "url": find_link(item, "https://www.the-sting.com") or url,
+                                "url": find_link(item, "https://www.thesting.com") or url,
                             })
 
                 for p in items_data[:30]:
