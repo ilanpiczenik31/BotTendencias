@@ -10,12 +10,6 @@ from models.database import (
 )
 from scrapers.zara import ZaraScraper
 from scrapers.hm import HMScraper
-from scrapers.bershka import BershkaScraper
-from scrapers.springfield import SpringfieldScraper
-from scrapers.the_sting import TheStingScraper
-from scrapers.jcrew import JCrewScraper
-from scrapers.north_face import NorthFaceScraper
-from scrapers.el_corte_ingles import ElCorteInglesScraper
 from scrapers.registry import REGISTRY
 from agents.analyzer import analyze_store_trends, generate_weekly_report
 
@@ -24,12 +18,6 @@ logger = logging.getLogger(__name__)
 SCRAPER_CLASSES = {
     "Zara": ZaraScraper,
     "H&M": HMScraper,
-    "Bershka": BershkaScraper,
-    "Springfield": SpringfieldScraper,
-    "The Sting": TheStingScraper,
-    "J.Crew": JCrewScraper,
-    "The North Face": NorthFaceScraper,
-    "El Corte Inglés": ElCorteInglesScraper,
 }
 
 # Scrapers that accept custom sections (others use their default SECTIONS list)

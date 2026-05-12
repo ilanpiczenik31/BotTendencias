@@ -28,19 +28,22 @@ Productos scraped esta semana de {store_name}:
 Analizá estos productos y respondé ÚNICAMENTE con un JSON válido con esta estructura exacta:
 {{
   "summary": "resumen breve de 2-3 oraciones sobre lo que predomina en esta tienda esta semana",
-  "colors": ["lista de colores predominantes que aparecen en los nombres"],
-  "styles": ["estilos o tendencias de corte/diseño detectados"],
-  "categories": ["tipos de prenda más frecuentes"],
+  "top_products": ["nombre del producto 1 más trendy", "nombre del producto 2", "nombre del producto 3"],
+  "colors": ["color1 (el más frecuente primero)", "color2", "color3"],
+  "styles": ["estilo1 (el más frecuente primero)", "estilo2", "estilo3"],
+  "categories": ["prenda1 (la más frecuente primero)", "prenda2", "prenda3"],
   "price_range": {{
     "min": número_o_null,
     "max": número_o_null,
     "average": número_o_null,
     "currency": "EUR_o_USD"
   }},
-  "keywords": ["palabras clave de tendencia que se repiten"],
+  "keywords": ["palabra1", "palabra2", "palabra3", "palabra4", "palabra5"],
   "trend_score": número del 1 al 10 indicando qué tan fuerte es la tendencia esta semana
 }}
 
+Para top_products: elegí los 3 productos con nombres más representativos de las tendencias de esta semana (no los más caros, sino los que mejor capturan el estilo predominante).
+Para colors, styles, categories: ordenar de más a menos frecuente, máximo 5 cada uno.
 Solo respondé con el JSON, sin texto adicional."""
 
     try:
@@ -86,20 +89,23 @@ Análisis por tienda esta semana:
 
 Respondé ÚNICAMENTE con un JSON válido:
 {{
-  "summary": "resumen ejecutivo de 3-4 oraciones sobre las tendencias generales de esta semana en Europa",
+  "summary": "resumen ejecutivo de 2-3 oraciones sobre las tendencias generales de esta semana en Europa",
   "top_trends": {{
-    "colors": ["top 5 colores más tendencia esta semana en todas las tiendas"],
-    "styles": ["top 5 estilos más repetidos"],
-    "categories": ["top 5 prendas más presentes"],
-    "keywords": ["top 10 palabras clave de tendencia"]
+    "top_products": ["producto más trendy 1 (con tienda)", "producto más trendy 2 (con tienda)", "producto más trendy 3 (con tienda)"],
+    "colors": ["color1 (el más frecuente en todas las tiendas)", "color2", "color3"],
+    "styles": ["estilo1", "estilo2", "estilo3"],
+    "categories": ["prenda1", "prenda2", "prenda3"],
+    "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"]
   }},
   "store_highlights": [
-    {{"store": "nombre", "highlight": "qué tiene de especial esta tienda esta semana"}}
+    {{"store": "nombre", "highlight": "qué tiene de especial esta tienda esta semana en 1 frase"}}
   ],
-  "argentina_recommendation": "recomendación específica para un vendedor de ropa en Argentina: qué tendencias europeas tiene sentido importar/replicar y por qué",
-  "vs_last_week": "descripción de qué cambió vs semana anterior (si hay datos) o null si es la primera corrida"
+  "argentina_recommendation": "recomendación concreta para un vendedor de ropa en Argentina: 2-3 tendencias específicas que tiene sentido importar/replicar esta semana",
+  "vs_last_week": "1 frase sobre qué cambió vs semana anterior, o null si es la primera corrida"
 }}
 
+Para top_products: elegí los 3 productos más representativos de las tendencias de esta semana entre todas las tiendas, con el formato "Nombre del producto (Tienda)".
+Para colors, styles, categories: solo los top 3, ordenados de más a menos frecuente.
 Solo respondé con el JSON, sin texto adicional."""
 
     try:
@@ -128,6 +134,7 @@ Solo respondé con el JSON, sin texto adicional."""
 def _empty_analysis() -> dict:
     return {
         "summary": "Sin datos suficientes para analizar",
+        "top_products": [],
         "colors": [],
         "styles": [],
         "categories": [],

@@ -36,6 +36,7 @@ export interface TrendAnalysis {
   store_id: number;
   summary: string;
   trends: {
+    top_products?: string[];
     colors?: string[];
     styles?: string[];
     categories?: string[];
@@ -52,6 +53,7 @@ export interface Report {
   run_date: string;
   summary: string;
   top_trends: {
+    top_products?: string[];
     colors?: string[];
     styles?: string[];
     categories?: string[];
