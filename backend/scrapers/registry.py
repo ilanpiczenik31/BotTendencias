@@ -10,9 +10,8 @@ REGISTRY: dict[str, list[dict]] = {
         {"key": "trending_women",     "label": "Trends · Mujer", "url": "https://www.zara.com/es/es/woman-events-l17929.html"},
     ],
     "Bershka": [
-        {"key": "new_arrivals_men",   "label": "Nuevo · Hombre",  "url": "https://www.bershka.com/es/hombre/novedades-n3745.html"},
-        {"key": "new_arrivals_women", "label": "Nuevo · Mujer",   "url": "https://www.bershka.com/es/mujer/novedades-n3283.html"},
-        {"key": "trending_women",     "label": "Trends · Mujer",  "url": "https://www.bershka.com/es/pag/bershkastyle.html?gender=66486574&style=66206357"},
+        {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.bershka.com/es/hombre/novedades-n3745.html"},
+        {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.bershka.com/es/mujer/novedades-n3283.html"},
     ],
     "H&M": [
         {"key": "new_arrivals_women",  "label": "Nuevo · Mujer",             "url": "https://www2.hm.com/es_es/mujer/novedades/ver-todo.html"},

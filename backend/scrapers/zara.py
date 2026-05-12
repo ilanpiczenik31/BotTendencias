@@ -78,12 +78,20 @@ def _parse_zara_product(p: dict) -> list[dict]:
     return [{"name": name, "image": image_url, "price": price, "currency": "EUR", "url": product_url or ""}]
 
 
+def _name_from_url(url: str) -> str:
+    """Extract readable name from Zara product URL slug."""
+    m = re.search(r"/([a-z][a-z0-9-]+)-p\d+\.html", url)
+    if m:
+        return m.group(1).replace("-", " ").title()
+    return ""
+
+
 def _parse_zara_html(soup, section_key: str) -> list[ScrapedProduct]:
     """
-    Parse Zara HTML product grid.
-    - Name: img with 'transparent-background' src has product name in alt ("NOMBRE - Color de Zara")
-    - Image: first real JPG img (not transparent-background)
-    - URL: first a.media-region or a.product-link href
+    Parse Zara HTML product grid. Two layouts exist:
+    - Hombre "double": transparent-background img has product name in alt ("NAME - Color de Zara")
+    - Mujer "zoom": product-link href contains name as slug (/vestido-midi-drapeado-p123.html)
+    Image always comes from the first real JPG.
     """
     results = []
     for item in soup.select("li.product-grid-product")[:80]:
@@ -91,21 +99,30 @@ def _parse_zara_html(soup, section_key: str) -> list[ScrapedProduct]:
         image_url = None
         product_url = None
 
+        # Get product URL first
+        link = item.select_one("a.product-link[href], a.media-region[href]")
+        if link:
+            product_url = link.get("href", "")
+            if product_url and not product_url.startswith("http"):
+                product_url = "https://www.zara.com" + product_url
+
         for img in item.find_all("img"):
             src = img.get("src", "")
             alt = img.get("alt", "").strip()
 
-            if "transparent-background" in src and alt and " de Zara" in alt:
-                # Product name is here: "PRODUCT NAME - Color de Zara"
-                name = alt.split(" - ")[0].strip()
-            elif ".jpg" in src and "static.zara.net" in src and not image_url:
+            # Strategy 1: transparent-background img has product name ("NAME - Color de Zara")
+            if "transparent-background" in src and alt and " de Zara" in alt and "Imagen de producto" not in alt:
+                candidate = alt.split(" - ")[0].strip()
+                if len(candidate) > 3:
+                    name = candidate
+
+            # Real product image
+            if ".jpg" in src and "static.zara.net" in src and "stdstatic" not in src and not image_url:
                 image_url = src
 
-        link = item.select_one("a.media-region[href], a.product-link[href], a[href*='/es/es/']")
-        if link:
-            product_url = link.get("href")
-            if product_url and not product_url.startswith("http"):
-                product_url = "https://www.zara.com" + product_url
+        # Strategy 2: extract from URL slug if no name found yet
+        if not name and product_url:
+            name = _name_from_url(product_url)
 
         if name:
             results.append(ScrapedProduct(
