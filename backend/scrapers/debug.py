@@ -1,3 +1,4 @@
+import json as json_lib
 from .base import fetch_page
 from bs4 import BeautifulSoup
 
@@ -29,7 +30,39 @@ async def inspect_page(url: str, wait: int = 5000) -> dict:
 
         headings = [h.get_text(strip=True) for h in soup.find_all(["h1", "h2"])[:5]]
         imgs = [{"src": img.get("src", ""), "alt": img.get("alt", "")} for img in soup.find_all("img")[:5]]
-        json_ld = [s.string[:500] for s in soup.find_all("script", type="application/ld+json") if s.string][:3]
+
+        # Full JSON-LD parsing — extract ItemList products
+        json_ld_products = []
+        json_ld_raw = []
+        for script in soup.find_all("script", type="application/ld+json"):
+            if not script.string:
+                continue
+            json_ld_raw.append(script.string[:3000])
+            try:
+                data = json_lib.loads(script.string)
+                if data.get("@type") == "ItemList":
+                    for entry in data.get("itemListElement", [])[:5]:
+                        item = entry.get("item", entry)
+                        offers = item.get("offers", {})
+                        image = item.get("image", "")
+                        if isinstance(image, list):
+                            image = image[0] if image else ""
+                        json_ld_products.append({
+                            "name": item.get("name", ""),
+                            "image": image[:100] if image else "",
+                            "price": offers.get("price"),
+                            "currency": offers.get("priceCurrency", ""),
+                            "url": offers.get("url") or item.get("url", ""),
+                        })
+            except Exception:
+                pass
+
+        # Sample product links
+        product_links = [
+            a.get("href", "")
+            for a in soup.find_all("a", href=True)
+            if "product" in a.get("href", "").lower()
+        ][:5]
 
         return {
             "title": soup.title.string if soup.title else "",
@@ -39,7 +72,9 @@ async def inspect_page(url: str, wait: int = 5000) -> dict:
             "likelyProductClasses": likely_product,
             "sampleHtml": sample_html,
             "sampleImages": imgs,
-            "jsonLdSnippets": json_ld,
+            "jsonLdSnippets": json_ld_raw,
+            "jsonLdProducts": json_ld_products,
+            "sampleProductLinks": product_links,
         }
     except Exception as e:
         return {"error": str(e), "url": url}
