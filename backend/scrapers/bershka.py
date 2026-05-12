@@ -82,8 +82,8 @@ class BershkaScraper(BaseScraper):
                                 ))
                         continue
 
-                # 2. Fallback: HTML with long wait
-                soup = await fetch_page(url, country="es", wait=15000)
+                # 2. Fallback: HTML with shorter wait (saves credits if blocked)
+                soup = await fetch_page(url, country="es", wait=8000)
                 items = extract_json_ld_products(soup)
 
                 if not items:
