@@ -131,16 +131,13 @@ class BaseScraper(ABC):
     async def scrape(self) -> list[ScrapedProduct]:
         try:
             products = await self._scrape()
-            seen: set[str] = set()
+            seen: set[tuple] = set()
             unique = []
             for p in products:
-                # Deduplicate by name OR by image_url (catches same product in different sections)
-                name_key = p.name.strip().lower()
-                img_key = (p.image_url or "").split("?")[0]  # strip query params
-                key = img_key if img_key else name_key
+                # Deduplicate only within the same section
+                key = (p.name.strip().lower(), p.section)
                 if key not in seen:
                     seen.add(key)
-                    seen.add(name_key)  # also block same name
                     unique.append(p)
             removed = len(products) - len(unique)
             logger.info(f"[{self.store_name}] scraped {len(unique)} products" + (f" ({removed} dupes removed)" if removed else ""))

@@ -121,12 +121,13 @@ async def _scrape_store(run_id: int, store: Store, sections: list[dict] | None):
         logger.warning(f"No products scraped for {store.name}")
         return
 
-    seen_names: set[str] = set()
+    # Deduplicate by (name, section) — keep same product if it appears in different sections
+    seen: set[tuple] = set()
     unique_products = []
     for p in products:
-        key = p.name.strip().lower()
-        if key not in seen_names:
-            seen_names.add(key)
+        key = (p.name.strip().lower(), p.section)
+        if key not in seen:
+            seen.add(key)
             unique_products.append(p)
 
     async with AsyncSessionLocal() as session:
