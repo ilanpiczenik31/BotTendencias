@@ -7,10 +7,8 @@ logger = logging.getLogger(__name__)
 BASE = "https://www2.hm.com"
 
 SECTIONS = [
-    ("https://www2.hm.com/es_es/mujer/novedades/ver-todo.html",       "new_arrivals_women"),
-    ("https://www2.hm.com/es_es/hombre/novedades/ver-todo.html",      "new_arrivals_men"),
-    ("https://www2.hm.com/es_es/mujer/mejores-ventas/ver-todo.html",  "best_sellers_women"),
-    ("https://www2.hm.com/es_es/hombre/mejores-ventas/ver-todo.html", "best_sellers_men"),
+    ("https://www2.hm.com/es_es/mujer/novedades/ver-todo.html",  "new_arrivals_women"),
+    ("https://www2.hm.com/es_es/hombre/novedades/ver-todo.html", "new_arrivals_men"),
 ]
 
 

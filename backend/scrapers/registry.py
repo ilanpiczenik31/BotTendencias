@@ -14,10 +14,8 @@ REGISTRY: dict[str, list[dict]] = {
         {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.bershka.com/es/mujer/novedades-n3283.html"},
     ],
     "H&M": [
-        {"key": "new_arrivals_women",  "label": "Nuevo · Mujer",             "url": "https://www2.hm.com/es_es/mujer/novedades/ver-todo.html"},
-        {"key": "new_arrivals_men",    "label": "Nuevo · Hombre",            "url": "https://www2.hm.com/es_es/hombre/novedades/ver-todo.html"},
-        {"key": "best_sellers_women",  "label": "Más vendidos · Mujer",      "url": "https://www2.hm.com/es_es/mujer/mejores-ventas/ver-todo.html"},
-        {"key": "best_sellers_men",    "label": "Más vendidos · Hombre",     "url": "https://www2.hm.com/es_es/hombre/mejores-ventas/ver-todo.html"},
+        {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www2.hm.com/es_es/mujer/novedades/ver-todo.html"},
+        {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www2.hm.com/es_es/hombre/novedades/ver-todo.html"},
     ],
     "Springfield": [
         {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.springfield.com/es/mujer/"},
