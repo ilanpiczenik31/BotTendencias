@@ -1,42 +1,56 @@
-from .base import BaseScraper, ScrapedProduct, fetch_page, extract_json_ld_products
+from .base import BaseScraper, ScrapedProduct, fetch_page, fetch_json, extract_json_ld_products
 from .registry import REGISTRY
+import re
 import logging
 
 logger = logging.getLogger(__name__)
 
+# Inditex API format for Bershka
+# URL like "novedades-n3745.html" → section ID 3745
+def _section_id(url: str) -> str | None:
+    m = re.search(r"-n(\d+)\.html", url)
+    return m.group(1) if m else None
 
-def _parse_bershka_html(soup, section_key: str) -> list[ScrapedProduct]:
-    """Parse Bershka product grid after React hydration."""
-    results = []
-    selectors = ["li.grid-item", "[class*='product-card']", "[class*='product-grid-item']"]
-    items = []
-    for sel in selectors:
-        items = soup.select(sel)
-        if items:
-            break
 
-    for item in items[:60]:
-        name = None
-        for sel in ["[class*='product-card__title']", "[class*='product-name']", "h2", "h3"]:
-            el = item.select_one(sel)
-            if el and el.get_text(strip=True):
-                name = el.get_text(strip=True)
-                break
-
-        img = item.select_one("img[src]")
-        src = img.get("src", "") if img else ""
-        image_url = src if src and "data:image" not in src else None
-
-        link = item.select_one("a[href]")
-        href = link.get("href", "") if link else ""
-        product_url = href if href.startswith("http") else ("https://www.bershka.com" + href if href else None)
-
-        if name and len(name) > 2:
-            results.append(ScrapedProduct(
-                name=name, section=section_key,
-                image_url=image_url, product_url=product_url, category="ropa",
-            ))
-    return results
+async def _fetch_bershka_api(section_id: str) -> list[dict]:
+    """Try Bershka's internal catalog API (same Inditex infrastructure as Zara)."""
+    candidates = [
+        f"https://www.bershka.com/es/es/category/{section_id}/products?ajax=true&page=0&pageSize=40",
+        f"https://www.bershka.com/es/category/{section_id}/products?ajax=true&page=0&pageSize=40",
+    ]
+    for api_url in candidates:
+        data = await fetch_json(api_url, country="es")
+        if not data:
+            continue
+        products = []
+        items = data if isinstance(data, list) else data.get("products", data.get("productGroups", []))
+        for item in (items or []):
+            if "elements" in item:
+                for elem in item.get("elements", []):
+                    for p in elem.get("commercialComponents", [elem]):
+                        name = p.get("name", "").strip()
+                        if name:
+                            products.append({
+                                "name": name,
+                                "image": None,
+                                "price": None,
+                                "currency": "EUR",
+                                "url": "",
+                            })
+            else:
+                name = item.get("name", "").strip()
+                if name:
+                    products.append({
+                        "name": name,
+                        "image": None,
+                        "price": None,
+                        "currency": "EUR",
+                        "url": "",
+                    })
+        if products:
+            logger.info(f"Bershka API returned {len(products)} products for section {section_id}")
+            return products
+    return []
 
 
 class BershkaScraper(BaseScraper):
@@ -52,17 +66,28 @@ class BershkaScraper(BaseScraper):
         for sec in self.sections:
             url, section_key = sec["url"], sec["key"]
             try:
-                # Bershka needs 15s for React to fully hydrate products
-                soup = await fetch_page(url, country="es", wait=15000, scroll=True)
+                # 1. Try internal API first
+                sec_id = _section_id(url)
+                if sec_id:
+                    api_items = await _fetch_bershka_api(sec_id)
+                    if api_items:
+                        for p in api_items[:60]:
+                            if p["name"]:
+                                products.append(ScrapedProduct(
+                                    name=p["name"], section=section_key,
+                                    price=p.get("price"), currency="EUR",
+                                    image_url=p.get("image") or None,
+                                    product_url=p.get("url") or None,
+                                    category="ropa",
+                                ))
+                        continue
+
+                # 2. Fallback: HTML with long wait
+                soup = await fetch_page(url, country="es", wait=15000)
                 items = extract_json_ld_products(soup)
 
                 if not items:
-                    html_items = _parse_bershka_html(soup, section_key)
-                    if html_items:
-                        products.extend(html_items)
-                        continue
-
-                    # Fallback: Inditex structure (same as Zara)
+                    # Inditex HTML structure (same as Zara)
                     for item in soup.select("li.product-grid-product")[:60]:
                         img = item.select_one("img")
                         src = img.get("src", "") if img else ""
@@ -73,13 +98,14 @@ class BershkaScraper(BaseScraper):
                             name = alt.split(" - ")[0].strip()
                         else:
                             name = None
-                        link = item.select_one("a[href]")
+                        link = item.select_one("a.product-link[href], a[href]")
                         href = link["href"] if link else ""
-                        product_url = href if href.startswith("http") else "https://www.bershka.com" + href
+                        if href and not href.startswith("http"):
+                            href = "https://www.bershka.com" + href
                         image_url = src if src and "transparent-background" not in src and "data:image" not in src else None
                         if name and len(name) > 2:
                             items.append({"name": name, "image": image_url,
-                                          "price": None, "currency": "EUR", "url": product_url})
+                                          "price": None, "currency": "EUR", "url": href})
 
                 for p in items[:60]:
                     if p.get("name") and len(p["name"]) > 2:

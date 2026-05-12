@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 async def inspect_page(url: str, wait: int = 5000) -> dict:
     """Fetch page via ScraperAPI and return structure info for selector debugging."""
     try:
-        soup = await fetch_page(url, wait=wait, scroll=True)
+        soup = await fetch_page(url, wait=wait)
 
         # Count repeated classes
         class_count: dict[str, int] = {}

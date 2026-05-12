@@ -170,14 +170,23 @@ class ZaraScraper(BaseScraper):
 
         for sec in self.sections:
             url, section_key = sec["url"], sec["key"]
+            soup = None
+            for wait_ms in [6000, 10000]:
+                try:
+                    soup = await fetch_page(url, country="es", wait=wait_ms)
+                    break
+                except Exception:
+                    logger.warning(f"Zara [{section_key}] retry with wait={wait_ms}ms")
+
+            if not soup:
+                logger.error(f"Zara [{section_key}] failed after retries: {url}")
+                continue
+
             try:
-                # HTML scraping — no scroll (causes 500 on Zara)
-                soup = await fetch_page(url, country="es", wait=6000)
                 parsed = _parse_zara_html(soup, section_key)
                 products.extend(parsed)
                 logger.info(f"Zara HTML [{section_key}]: {len(parsed)} products")
-
             except Exception as e:
-                logger.error(f"Zara [{section_key}] {url}: {e}")
+                logger.error(f"Zara [{section_key}] parse error: {e}")
 
         return products
