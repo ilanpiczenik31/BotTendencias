@@ -115,25 +115,8 @@ class ZaraScraper(BaseScraper):
         for sec in self.sections:
             url, section_key = sec["url"], sec["key"]
             try:
-                # Try internal API first (more products, no browser needed)
-                cat_id = _category_id(url)
-                api_items = await _fetch_via_api(cat_id) if cat_id else []
-
-                if api_items:
-                    logger.info(f"Zara API returned {len(api_items)} products for {section_key}")
-                    for p in api_items[:60]:
-                        if p["name"]:
-                            products.append(ScrapedProduct(
-                                name=p["name"], section=section_key,
-                                price=p.get("price"), currency="EUR",
-                                image_url=p.get("image") or None,
-                                product_url=p.get("url") or None,
-                                category="ropa",
-                            ))
-                    continue
-
-                # Fallback: HTML scraping
-                soup = await fetch_page(url, country="es", wait=5000, scroll=True)
+                # HTML scraping — no scroll (causes 500 on Zara)
+                soup = await fetch_page(url, country="es", wait=6000)
                 json_items = _extract_json_ld(soup)
 
                 if json_items:
