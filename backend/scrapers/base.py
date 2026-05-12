@@ -28,6 +28,31 @@ class ScrapedProduct:
     category: Optional[str] = None
 
 
+async def fetch_json(url: str, country: str = "es") -> dict | list | None:
+    """Fetch a JSON endpoint through ScraperAPI without browser rendering."""
+    params = {
+        "api_key": SCRAPER_API_KEY,
+        "url": url,
+        "country_code": country,
+    }
+    async with _semaphore:
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=60) as client:
+                    resp = await client.get(SCRAPER_API_BASE, params=params)
+                    if resp.status_code == 429:
+                        await asyncio.sleep(10 * (attempt + 1))
+                        continue
+                    resp.raise_for_status()
+                    return resp.json()
+            except Exception as e:
+                if attempt < 2:
+                    await asyncio.sleep(5)
+                    continue
+                logger.debug(f"fetch_json failed: {e}")
+    return None
+
+
 async def fetch_page(url: str, country: str = "es", wait: int = 3000, scroll: bool = False) -> BeautifulSoup:
     """Fetch a page through ScraperAPI with concurrency limiting and retry."""
     params = {
