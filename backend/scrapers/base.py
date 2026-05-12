@@ -28,7 +28,7 @@ class ScrapedProduct:
     category: Optional[str] = None
 
 
-async def fetch_page(url: str, country: str = "es", wait: int = 3000) -> BeautifulSoup:
+async def fetch_page(url: str, country: str = "es", wait: int = 3000, scroll: bool = False) -> BeautifulSoup:
     """Fetch a page through ScraperAPI with concurrency limiting and retry."""
     params = {
         "api_key": SCRAPER_API_KEY,
@@ -38,6 +38,8 @@ async def fetch_page(url: str, country: str = "es", wait: int = 3000) -> Beautif
         "wait_for_selector": "body",
         "wait": str(wait),
     }
+    if scroll:
+        params["scroll"] = "true"
     async with _semaphore:
         for attempt in range(3):
             try:

@@ -18,7 +18,7 @@ class ElCorteInglesScraper(BaseScraper):
 
         for url, section in SECTIONS:
             try:
-                soup = await fetch_page(url, country="es", wait=5000)
+                soup = await fetch_page(url, country="es", wait=5000, scroll=True)
                 items = extract_json_ld_products(soup)
 
                 if not items:
@@ -42,7 +42,7 @@ class ElCorteInglesScraper(BaseScraper):
                             items.append({"name": name, "image": image_url,
                                           "price": price, "currency": "EUR", "url": url})
 
-                for p in items[:30]:
+                for p in items[:60]:
                     if p["name"]:
                         img = p.get("image")
                         if img and img.startswith("//"):

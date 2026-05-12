@@ -40,7 +40,7 @@ class JCrewScraper(BaseScraper):
 
         for url, section in SECTIONS:
             try:
-                soup = await fetch_page(url, country="us", wait=5000)
+                soup = await fetch_page(url, country="us", wait=5000, scroll=True)
                 items_data = extract_json_ld_products(soup)
 
                 if not items_data:
@@ -49,7 +49,7 @@ class JCrewScraper(BaseScraper):
                         containers = soup.select(sel)
                         if containers:
                             break
-                    for item in containers[:30]:
+                    for item in containers[:60]:
                         name = None
                         for sel in NAME_SELECTORS:
                             el = item.select_one(sel)
@@ -71,7 +71,7 @@ class JCrewScraper(BaseScraper):
                                 "url": find_link(item, "https://www.jcrew.com") or url,
                             })
 
-                for p in items_data[:30]:
+                for p in items_data[:60]:
                     if p["name"]:
                         products.append(ScrapedProduct(
                             name=p["name"], section=section,

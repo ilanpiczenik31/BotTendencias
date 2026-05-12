@@ -20,7 +20,7 @@ class HMScraper(BaseScraper):
 
         for url, section in SECTIONS:
             try:
-                soup = await fetch_page(url, country="es", wait=5000)
+                soup = await fetch_page(url, country="es", wait=5000, scroll=True)
                 items = extract_json_ld_products(soup, base_url="https://www2.hm.com")
 
                 if not items:
@@ -31,7 +31,7 @@ class HMScraper(BaseScraper):
                             items.append({"name": name, "image": img["src"],
                                           "price": None, "currency": "EUR", "url": ""})
 
-                for p in items[:30]:
+                for p in items[:60]:
                     if p["name"]:
                         product_url = p.get("url") or None
                         # Fix relative URLs from H&M JSON-LD

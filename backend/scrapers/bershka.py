@@ -18,7 +18,7 @@ class BershkaScraper(BaseScraper):
         for sec in self.sections:
             url, section_key = sec["url"], sec["key"]
             try:
-                soup = await fetch_page(url, country="es", wait=5000)
+                soup = await fetch_page(url, country="es", wait=5000, scroll=True)
                 items = extract_json_ld_products(soup)
 
                 if not items:
@@ -37,7 +37,7 @@ class BershkaScraper(BaseScraper):
                             items.append({"name": name, "image": image_url,
                                           "price": None, "currency": "EUR", "url": product_url or ""})
 
-                for p in items[:30]:
+                for p in items[:60]:
                     if p["name"]:
                         products.append(ScrapedProduct(
                             name=p["name"], section=section_key,

@@ -43,7 +43,7 @@ class ZaraScraper(BaseScraper):
         for sec in self.sections:
             url, section_key = sec["url"], sec["key"]
             try:
-                soup = await fetch_page(url, country="es", wait=5000)
+                soup = await fetch_page(url, country="es", wait=5000, scroll=True)
                 json_items = _extract_json_ld(soup)
 
                 if json_items:
@@ -60,7 +60,7 @@ class ZaraScraper(BaseScraper):
                     continue
 
                 # HTML fallback
-                for item in soup.select("li.product-grid-product")[:30]:
+                for item in soup.select("li.product-grid-product")[:60]:
                     img = item.select_one("img.media-image__image")
                     name = None
                     if img:
