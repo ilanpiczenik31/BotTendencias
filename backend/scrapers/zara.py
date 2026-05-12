@@ -78,6 +78,45 @@ def _parse_zara_product(p: dict) -> list[dict]:
     return [{"name": name, "image": image_url, "price": price, "currency": "EUR", "url": product_url or ""}]
 
 
+def _parse_zara_html(soup, section_key: str) -> list[ScrapedProduct]:
+    """
+    Parse Zara HTML product grid.
+    - Name: img with 'transparent-background' src has product name in alt ("NOMBRE - Color de Zara")
+    - Image: first real JPG img (not transparent-background)
+    - URL: first a.media-region or a.product-link href
+    """
+    results = []
+    for item in soup.select("li.product-grid-product")[:80]:
+        name = None
+        image_url = None
+        product_url = None
+
+        for img in item.find_all("img"):
+            src = img.get("src", "")
+            alt = img.get("alt", "").strip()
+
+            if "transparent-background" in src and alt and " de Zara" in alt:
+                # Product name is here: "PRODUCT NAME - Color de Zara"
+                name = alt.split(" - ")[0].strip()
+            elif ".jpg" in src and "static.zara.net" in src and not image_url:
+                image_url = src
+
+        link = item.select_one("a.media-region[href], a.product-link[href], a[href*='/es/es/']")
+        if link:
+            product_url = link.get("href")
+            if product_url and not product_url.startswith("http"):
+                product_url = "https://www.zara.com" + product_url
+
+        if name:
+            results.append(ScrapedProduct(
+                name=name, section=section_key,
+                image_url=image_url, product_url=product_url,
+                category="ropa",
+            ))
+
+    return results
+
+
 def _extract_json_ld(soup) -> list[dict]:
     for script in soup.find_all("script", type="application/ld+json"):
         try:
@@ -117,37 +156,9 @@ class ZaraScraper(BaseScraper):
             try:
                 # HTML scraping — no scroll (causes 500 on Zara)
                 soup = await fetch_page(url, country="es", wait=6000)
-                json_items = _extract_json_ld(soup)
-
-                if json_items:
-                    for p in json_items:
-                        if p["name"]:
-                            products.append(ScrapedProduct(
-                                name=p["name"], section=section_key,
-                                price=float(p["price"]) if p["price"] else None,
-                                currency=p.get("currency", "EUR"),
-                                image_url=p["image"] or None,
-                                product_url=p["url"] or None,
-                                category="ropa",
-                            ))
-                    continue
-
-                for item in soup.select("li.product-grid-product")[:60]:
-                    img = item.select_one("img.media-image__image")
-                    name = None
-                    if img:
-                        alt = img.get("alt", "")
-                        name = alt.split(" - ")[0].strip() if " - " in alt else alt.strip()
-                    link = item.select_one("a.product-link")
-                    product_url = link.get("href") if link else None
-                    image_url = img.get("src") if img else None
-                    if image_url and "transparent-background" in image_url:
-                        image_url = None
-                    if name:
-                        products.append(ScrapedProduct(
-                            name=name, section=section_key,
-                            image_url=image_url, product_url=product_url, category="ropa",
-                        ))
+                parsed = _parse_zara_html(soup, section_key)
+                products.extend(parsed)
+                logger.info(f"Zara HTML [{section_key}]: {len(parsed)} products")
 
             except Exception as e:
                 logger.error(f"Zara [{section_key}] {url}: {e}")
