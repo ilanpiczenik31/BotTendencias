@@ -254,7 +254,7 @@ async def get_stats(session: AsyncSession = Depends(get_session)):
 # ── Debug ─────────────────────────────────────────────────────────────────────
 
 @router.get("/debug/inspect")
-async def debug_inspect(url: str):
+async def debug_inspect(url: str, wait: int = 5000):
     """Inspect a page's HTML structure to find correct CSS selectors."""
-    result = await inspect_page(url)
+    result = await inspect_page(url, wait=wait)
     return result
