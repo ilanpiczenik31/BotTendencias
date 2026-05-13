@@ -234,7 +234,7 @@ class ZaraScraper(BaseScraper):
                 # 1. Try __NEXT_DATA__ (React SSR state — has prices + images)
                 next_items = _extract_next_data(soup)
                 if next_items:
-                    for p in next_items[:40]:
+                    for p in next_items[:20]:
                         if p.get("name"):
                             products.append(ScrapedProduct(
                                 name=p["name"], section=section_key,
@@ -246,29 +246,62 @@ class ZaraScraper(BaseScraper):
                     logger.info(f"Zara __NEXT_DATA__ [{section_key}]: {len(next_items)} products")
                     continue
 
-                # 2. Try JSON-LD (schema.org ItemList — has prices + images)
+                # 2. JSON-LD (10 products with price+image) + HTML grid (20+ names+URLs)
+                # Merge: enrich HTML products with JSON-LD data when available
                 jld_items = _extract_json_ld(soup)
-                if jld_items:
-                    for p in jld_items[:40]:
-                        if p.get("name"):
-                            image = p.get("image", "")
-                            if isinstance(image, list):
-                                image = image[0] if image else ""
-                            products.append(ScrapedProduct(
-                                name=p["name"], section=section_key,
-                                price=float(p["price"]) if p.get("price") else None,
-                                currency=p.get("currency", "EUR"),
-                                image_url=image or None,
-                                product_url=p.get("url") or None,
-                                category="ropa",
-                            ))
-                    logger.info(f"Zara JSON-LD [{section_key}]: {len(jld_items)} products")
-                    continue
+                html_items = _parse_zara_html(soup, section_key)
 
-                # 3. HTML grid parsing (names only, no prices — last resort)
-                parsed = _parse_zara_html(soup, section_key)
-                products.extend(parsed)
-                logger.info(f"Zara HTML [{section_key}]: {len(parsed)} products (no prices/images)")
+                # Build lookup: JSON-LD by lowercase name
+                jld_by_name: dict[str, dict] = {}
+                for p in jld_items:
+                    if p.get("name"):
+                        image = p.get("image", "")
+                        if isinstance(image, list):
+                            image = image[0] if image else ""
+                        jld_by_name[p["name"].strip().lower()] = {
+                            "price": float(p["price"]) if p.get("price") else None,
+                            "currency": p.get("currency", "EUR"),
+                            "image": image or None,
+                            "url": p.get("url") or None,
+                        }
+
+                # Start with HTML products (up to 20), enrich with JSON-LD
+                merged: list[ScrapedProduct] = []
+                for p in html_items[:20]:
+                    enriched = jld_by_name.get(p.name.strip().lower(), {})
+                    merged.append(ScrapedProduct(
+                        name=p.name, section=section_key,
+                        price=enriched.get("price"),
+                        currency=enriched.get("currency", "EUR"),
+                        image_url=enriched.get("image") or p.image_url,
+                        product_url=p.product_url or enriched.get("url"),
+                        category="ropa",
+                    ))
+
+                # If HTML had fewer than 20, fill remaining from JSON-LD names not yet included
+                existing_names = {p.name.strip().lower() for p in merged}
+                for p in jld_items:
+                    if len(merged) >= 20:
+                        break
+                    if p.get("name") and p["name"].strip().lower() not in existing_names:
+                        image = p.get("image", "")
+                        if isinstance(image, list):
+                            image = image[0] if image else ""
+                        merged.append(ScrapedProduct(
+                            name=p["name"], section=section_key,
+                            price=float(p["price"]) if p.get("price") else None,
+                            currency=p.get("currency", "EUR"),
+                            image_url=image or None,
+                            product_url=p.get("url") or None,
+                            category="ropa",
+                        ))
+                        existing_names.add(p["name"].strip().lower())
+
+                products.extend(merged)
+                logger.info(
+                    f"Zara [{section_key}]: {len(merged)} products "
+                    f"(JSON-LD: {len(jld_items)}, HTML: {len(html_items)})"
+                )
             except Exception as e:
                 logger.error(f"Zara [{section_key}] parse error: {e}")
 
