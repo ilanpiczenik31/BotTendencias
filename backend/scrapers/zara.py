@@ -231,7 +231,7 @@ class ZaraScraper(BaseScraper):
                 continue
 
             try:
-                # Try __NEXT_DATA__ first (full product data with prices)
+                # 1. Try __NEXT_DATA__ (React SSR state — has prices + images)
                 next_items = _extract_next_data(soup)
                 if next_items:
                     for p in next_items[:40]:
@@ -244,11 +244,31 @@ class ZaraScraper(BaseScraper):
                                 category="ropa",
                             ))
                     logger.info(f"Zara __NEXT_DATA__ [{section_key}]: {len(next_items)} products")
-                else:
-                    # Fall back to HTML grid parsing
-                    parsed = _parse_zara_html(soup, section_key)
-                    products.extend(parsed)
-                    logger.info(f"Zara HTML [{section_key}]: {len(parsed)} products")
+                    continue
+
+                # 2. Try JSON-LD (schema.org ItemList — has prices + images)
+                jld_items = _extract_json_ld(soup)
+                if jld_items:
+                    for p in jld_items[:40]:
+                        if p.get("name"):
+                            image = p.get("image", "")
+                            if isinstance(image, list):
+                                image = image[0] if image else ""
+                            products.append(ScrapedProduct(
+                                name=p["name"], section=section_key,
+                                price=float(p["price"]) if p.get("price") else None,
+                                currency=p.get("currency", "EUR"),
+                                image_url=image or None,
+                                product_url=p.get("url") or None,
+                                category="ropa",
+                            ))
+                    logger.info(f"Zara JSON-LD [{section_key}]: {len(jld_items)} products")
+                    continue
+
+                # 3. HTML grid parsing (names only, no prices — last resort)
+                parsed = _parse_zara_html(soup, section_key)
+                products.extend(parsed)
+                logger.info(f"Zara HTML [{section_key}]: {len(parsed)} products (no prices/images)")
             except Exception as e:
                 logger.error(f"Zara [{section_key}] parse error: {e}")
 
