@@ -12,12 +12,7 @@ const SECTION_LABELS: Record<string, string> = {
   trending_women:     "Trends · Mujer",
 };
 
-const SECTION_FILTERS = [
-  { value: "",                   label: "Todos" },
-  { value: "new_arrivals_women", label: "Nuevo · Mujer" },
-  { value: "new_arrivals_men",   label: "Nuevo · Hombre" },
-  { value: "trending_women",     label: "Trends · Mujer" },
-];
+const SECTION_ORDER = ["new_arrivals_women", "new_arrivals_men", "trending_women"];
 
 export default function TrendsPage() {
   const [runs, setRuns] = useState<Run[]>([]);
@@ -29,6 +24,7 @@ export default function TrendsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [diff, setDiff] = useState<StoreDiff[]>([]);
   const [activeTab, setActiveTab] = useState<"products" | "novedades">("products");
+  const [activeSection, setActiveSection] = useState<string>("");
   const [loadingData, setLoadingData] = useState(false);
 
   useEffect(() => {
@@ -51,10 +47,6 @@ export default function TrendsPage() {
       .finally(() => setLoadingData(false));
   }, [selectedRun, selectedStore]);
 
-  const filteredProducts = selectedSection
-    ? products.filter(p => p.section === selectedSection)
-    : products;
-
   const analysis = selectedStore
     ? analyses.find(a => a.store_id === selectedStore)
     : null;
@@ -64,10 +56,17 @@ export default function TrendsPage() {
     return acc;
   }, {} as Record<string, number>);
 
-  // Only show section filters that have products
-  const activeSectionFilters = SECTION_FILTERS.filter(
-    f => !f.value || sectionCounts[f.value]
-  );
+  // Sections that actually have products, in display order
+  const availableSections = SECTION_ORDER.filter(s => sectionCounts[s] > 0);
+
+  // Auto-select first available section when products load
+  const currentSection = activeSection && availableSections.includes(activeSection)
+    ? activeSection
+    : availableSections[0] ?? "";
+
+  const sectionProducts = currentSection
+    ? products.filter(p => p.section === currentSection).slice(0, 20)
+    : products.slice(0, 20);
 
   return (
     <div className="space-y-6">
@@ -104,30 +103,6 @@ export default function TrendsPage() {
         ))}
       </div>
 
-      {/* Section filter — only show sections with data */}
-      {activeSectionFilters.length > 1 && (
-        <div className="flex flex-wrap gap-2">
-          {activeSectionFilters.map(f => (
-            <button key={f.value}
-              onClick={() => setSelectedSection(selectedSection === f.value ? "" : f.value)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                selectedSection === f.value
-                  ? "bg-neutral-200 text-neutral-900"
-                  : "bg-neutral-800/60 text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800"
-              }`}
-            >
-              {f.label}
-              {f.value && sectionCounts[f.value] ? (
-                <span className={`text-xs rounded-full px-1.5 py-0.5 ${
-                  selectedSection === f.value ? "bg-neutral-400 text-neutral-900" : "bg-neutral-700 text-neutral-400"
-                }`}>
-                  {sectionCounts[f.value]}
-                </span>
-              ) : null}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-neutral-800">
@@ -163,21 +138,43 @@ export default function TrendsPage() {
             </div>
           )}
 
-          {/* Products grid */}
-          {filteredProducts.length > 0 && (
-            <div>
-              <h2 className="text-xs font-semibold text-neutral-600 uppercase tracking-wide mb-4">
-                Productos ({filteredProducts.length})
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
-                {filteredProducts.slice(0, 100).map(p => <ProductCard key={p.id} product={p} />)}
+          {/* Section tabs */}
+          {availableSections.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex gap-1 border-b border-neutral-800">
+                {availableSections.map(sec => (
+                  <button key={sec}
+                    onClick={() => setActiveSection(sec)}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                      currentSection === sec
+                        ? "border-white text-white"
+                        : "border-transparent text-neutral-500 hover:text-neutral-300"
+                    }`}>
+                    {SECTION_LABELS[sec] ?? sec}
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                      currentSection === sec ? "bg-neutral-700 text-neutral-300" : "bg-neutral-800 text-neutral-600"
+                    }`}>
+                      {sectionCounts[sec]}
+                    </span>
+                  </button>
+                ))}
               </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
+                {sectionProducts.map(p => <ProductCard key={p.id} product={p} />)}
+              </div>
+
+              {sectionProducts.length === 0 && (
+                <div className="text-center py-16 text-neutral-700 text-sm">
+                  No hay productos para esta sección.
+                </div>
+              )}
             </div>
           )}
 
-          {filteredProducts.length === 0 && !loadingData && selectedRun && (
+          {availableSections.length === 0 && !loadingData && selectedRun && (
             <div className="text-center py-20 text-neutral-700 text-sm">
-              No hay productos para esta selección.
+              No hay productos todavía.
             </div>
           )}
         </>

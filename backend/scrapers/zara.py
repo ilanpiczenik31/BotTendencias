@@ -56,19 +56,18 @@ def _parse_zara_product(p: dict) -> list[dict]:
         if raw:
             price = float(raw) / 100
 
-    # Image
-    image_url = None
-    media = p.get("detail", {}).get("colors", [{}])[0].get("xmedia", [{}])[0] if p.get("detail") else {}
-    if media:
-        path = media.get("path", "")
-        name_img = media.get("name", "")
-        timestamp = media.get("timestamp", "")
-        if path and name_img:
-            image_url = f"https://static.zara.net/photos/{path}{name_img}/w/750/{name_img}.jpg?ts={timestamp}"
-
-    # Fallback image from mainImgUrl
-    if not image_url:
-        image_url = p.get("mainImgUrl") or p.get("imageUrl")
+    # Image — try media first, then direct fields
+    image_url = p.get("mainImgUrl") or p.get("imageUrl")
+    try:
+        media = p.get("detail", {}).get("colors", [{}])[0].get("xmedia", [{}])[0]
+        if media:
+            path = media.get("path", "").strip("/")
+            name_img = media.get("name", "")
+            timestamp = media.get("timestamp", "")
+            if path and name_img:
+                image_url = f"https://static.zara.net/photos/{path}/{name_img}/1/w/750/{name_img}.jpg?ts={timestamp}"
+    except Exception:
+        pass
 
     seo = p.get("seo", {})
     product_url = None
@@ -107,18 +106,25 @@ def _parse_zara_html(soup, section_key: str) -> list[ScrapedProduct]:
                 product_url = "https://www.zara.com" + product_url
 
         for img in item.find_all("img"):
-            src = img.get("src", "")
+            # src may be empty due to lazy loading — also check data-src and srcset
+            src = img.get("src", "") or img.get("data-src", "")
+            srcset = img.get("srcset", "") or img.get("data-srcset", "")
             alt = img.get("alt", "").strip()
 
+            # Pick best URL: prefer src, then first entry in srcset
+            best_src = src
+            if not best_src and srcset:
+                best_src = srcset.split(",")[0].strip().split(" ")[0]
+
             # Strategy 1: transparent-background img has product name ("NAME - Color de Zara")
-            if "transparent-background" in src and alt and " de Zara" in alt and "Imagen de producto" not in alt:
+            if "transparent-background" in best_src and alt and " de Zara" in alt and "Imagen de producto" not in alt:
                 candidate = alt.split(" - ")[0].strip()
                 if len(candidate) > 3:
                     name = candidate
 
-            # Real product image
-            if ".jpg" in src and "static.zara.net" in src and "stdstatic" not in src and not image_url:
-                image_url = src
+            # Real product image (static.zara.net JPG)
+            if not image_url and best_src and ".jpg" in best_src and "static.zara.net" in best_src and "stdstatic" not in best_src:
+                image_url = best_src
 
         # Strategy 2: extract from URL slug if no name found yet
         if not name and product_url:
@@ -170,13 +176,35 @@ class ZaraScraper(BaseScraper):
 
         for sec in self.sections:
             url, section_key = sec["url"], sec["key"]
+
+            # 1. Try internal Zara API first — returns prices + images reliably
+            cat_id = _category_id(url)
+            if cat_id:
+                try:
+                    api_items = await _fetch_via_api(cat_id, page_size=40)
+                    if api_items:
+                        for p in api_items[:40]:
+                            if p.get("name"):
+                                products.append(ScrapedProduct(
+                                    name=p["name"], section=section_key,
+                                    price=p.get("price"), currency="EUR",
+                                    image_url=p.get("image") or None,
+                                    product_url=p.get("url") or None,
+                                    category="ropa",
+                                ))
+                        logger.info(f"Zara API [{section_key}]: {len(api_items)} products")
+                        continue
+                except Exception as e:
+                    logger.warning(f"Zara API [{section_key}] failed ({e}), falling back to HTML")
+
+            # 2. Fallback: HTML scraping
             soup = None
             for wait_ms in [6000, 10000]:
                 try:
                     soup = await fetch_page(url, country="es", wait=wait_ms)
                     break
                 except Exception:
-                    logger.warning(f"Zara [{section_key}] retry with wait={wait_ms}ms")
+                    logger.warning(f"Zara [{section_key}] HTML retry with wait={wait_ms}ms")
 
             if not soup:
                 logger.error(f"Zara [{section_key}] failed after retries: {url}")
