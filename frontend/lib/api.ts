@@ -81,6 +81,18 @@ export interface Store {
   active: boolean;
 }
 
+export interface StoreDiff {
+  store: string;
+  store_id: number;
+  prev_run_date: string;
+  total_current: number;
+  total_prev: number;
+  new_count: number;
+  removed_count: number;
+  new_products: Product[];
+  removed_products: Product[];
+}
+
 export interface Stats {
   total_runs: number;
   total_products: number;
@@ -105,6 +117,7 @@ export const api = {
   getReports: (limit = 10) => apiFetch<Report[]>(`/api/reports?limit=${limit}`),
   getLatestReport: () => apiFetch<Report>("/api/reports/latest"),
   getReportByRun: (runId: number) => apiFetch<Report>(`/api/reports/${runId}`),
+  getRunDiff: (runId: number) => apiFetch<StoreDiff[]>(`/api/runs/${runId}/diff`),
   getStores: () => apiFetch<Store[]>("/api/stores"),
   getStats: () => apiFetch<Stats>("/api/stats"),
 };

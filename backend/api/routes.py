@@ -251,6 +251,78 @@ async def get_stats(session: AsyncSession = Depends(get_session)):
     }
 
 
+# ── Diff ──────────────────────────────────────────────────────────────────────
+
+@router.get("/runs/{run_id}/diff")
+async def get_run_diff(run_id: int, session: AsyncSession = Depends(get_session)):
+    """Compare products from run_id vs the previous completed run, per store."""
+    # Get previous completed run
+    prev_result = await session.execute(
+        select(WeeklyRun)
+        .where(WeeklyRun.id != run_id, WeeklyRun.status == RunStatus.completed)
+        .order_by(desc(WeeklyRun.created_at))
+        .limit(1)
+    )
+    prev_run = prev_result.scalar_one_or_none()
+
+    if not prev_run:
+        return []  # No previous run to compare against
+
+    # Get active stores
+    stores_result = await session.execute(select(Store).where(Store.active == True))
+    stores = stores_result.scalars().all()
+
+    diffs = []
+    for store in stores:
+        # Current run products
+        cur_result = await session.execute(
+            select(Product, Store)
+            .join(Store, Product.store_id == Store.id)
+            .where(Product.run_id == run_id, Product.store_id == store.id)
+        )
+        cur_rows = cur_result.all()
+
+        # Previous run products
+        prev_p_result = await session.execute(
+            select(Product, Store)
+            .join(Store, Product.store_id == Store.id)
+            .where(Product.run_id == prev_run.id, Product.store_id == store.id)
+        )
+        prev_rows = prev_p_result.all()
+
+        if not cur_rows and not prev_rows:
+            continue
+
+        def product_key(p): return (p.name.strip().lower(), p.section)
+        def serialize(p, s):
+            return {
+                "id": p.id, "store": s.name, "store_id": s.id,
+                "name": p.name, "price": float(p.price) if p.price else None,
+                "currency": p.currency, "image_url": p.image_url,
+                "product_url": p.product_url, "section": p.section, "category": p.category,
+            }
+
+        cur_map = {product_key(p): (p, s) for p, s in cur_rows}
+        prev_map = {product_key(p): (p, s) for p, s in prev_rows}
+
+        new_keys = set(cur_map) - set(prev_map)
+        removed_keys = set(prev_map) - set(cur_map)
+
+        diffs.append({
+            "store": store.name,
+            "store_id": store.id,
+            "prev_run_date": prev_run.run_date.isoformat(),
+            "total_current": len(cur_rows),
+            "total_prev": len(prev_rows),
+            "new_count": len(new_keys),
+            "removed_count": len(removed_keys),
+            "new_products": [serialize(p, s) for p, s in [cur_map[k] for k in new_keys]][:30],
+            "removed_products": [serialize(p, s) for p, s in [prev_map[k] for k in removed_keys]][:30],
+        })
+
+    return diffs
+
+
 # ── Debug ─────────────────────────────────────────────────────────────────────
 
 @router.get("/debug/inspect")
