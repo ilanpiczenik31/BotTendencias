@@ -28,6 +28,28 @@ class ScrapedProduct:
     category: Optional[str] = None
 
 
+_BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+    "Referer": "https://www.zara.com/es/es/",
+    "X-Requested-With": "XMLHttpRequest",
+}
+
+
+async def fetch_json_direct(url: str, extra_headers: dict | None = None) -> dict | list | None:
+    """Fetch a JSON endpoint directly (no proxy) with browser-like headers."""
+    headers = {**_BROWSER_HEADERS, **(extra_headers or {})}
+    try:
+        async with httpx.AsyncClient(timeout=20, headers=headers, follow_redirects=True) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        logger.debug(f"fetch_json_direct failed for {url}: {e}")
+    return None
+
+
 async def fetch_json(url: str, country: str = "es") -> dict | list | None:
     """Fetch a JSON endpoint through ScraperAPI without browser rendering."""
     params = {
@@ -53,7 +75,7 @@ async def fetch_json(url: str, country: str = "es") -> dict | list | None:
     return None
 
 
-async def fetch_page(url: str, country: str = "es", wait: int = 3000, scroll: bool = False) -> BeautifulSoup:
+async def fetch_page(url: str, country: str = "es", wait: int = 3000, scroll: bool = False, premium: bool = False) -> BeautifulSoup:
     """Fetch a page through ScraperAPI with concurrency limiting and retry."""
     params = {
         "api_key": SCRAPER_API_KEY,
@@ -65,6 +87,8 @@ async def fetch_page(url: str, country: str = "es", wait: int = 3000, scroll: bo
     }
     if scroll:
         params["scroll"] = "true"
+    if premium:
+        params["premium"] = "true"
     async with _semaphore:
         for attempt in range(3):
             try:

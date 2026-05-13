@@ -1,6 +1,6 @@
 import json
 import re
-from .base import BaseScraper, ScrapedProduct, fetch_page, fetch_json
+from .base import BaseScraper, ScrapedProduct, fetch_page, fetch_json, fetch_json_direct
 from .registry import REGISTRY
 import logging
 
@@ -17,12 +17,16 @@ def _category_id(url: str) -> str | None:
 
 
 async def _fetch_via_api(category_id: str, page_size: int = 40) -> list[dict]:
-    """Call Zara's internal AJAX API to get products directly."""
+    """Call Zara's internal AJAX API to get products directly (no proxy needed for JSON)."""
     api_url = (
         f"https://www.zara.com/es/es/category/{category_id}/products"
         f"?ajax=true&page=0&pageSize={page_size}&sortBy=newest"
     )
-    data = await fetch_json(api_url, country="es")
+    # Try direct call first (no ScraperAPI — Zara's JSON API works with browser headers)
+    data = await fetch_json_direct(api_url, extra_headers={"Referer": "https://www.zara.com/es/es/"})
+    if not data:
+        # Fallback through ScraperAPI proxy
+        data = await fetch_json(api_url, country="es")
     if not data:
         return []
 
@@ -140,6 +144,42 @@ def _parse_zara_html(soup, section_key: str) -> list[ScrapedProduct]:
     return results
 
 
+def _extract_next_data(soup) -> list[dict]:
+    """Extract products from Next.js __NEXT_DATA__ embedded JSON."""
+    script = soup.find("script", id="__NEXT_DATA__")
+    if not script or not script.string:
+        return []
+    try:
+        data = json.loads(script.string)
+        products = []
+        # Walk the props tree looking for product arrays
+        def find_products(obj, depth=0):
+            if depth > 10 or not isinstance(obj, (dict, list)):
+                return
+            if isinstance(obj, list):
+                for item in obj:
+                    find_products(item, depth + 1)
+            elif isinstance(obj, dict):
+                name = obj.get("name", "").strip()
+                # Looks like a product if it has a name + price or image
+                if name and len(name) > 3 and ("price" in obj or "xmedia" in obj or "seo" in obj):
+                    products.extend(_parse_zara_product(obj))
+                for v in obj.values():
+                    find_products(v, depth + 1)
+        find_products(data)
+        # Deduplicate by name
+        seen = set()
+        unique = []
+        for p in products:
+            if p["name"] not in seen:
+                seen.add(p["name"])
+                unique.append(p)
+        return unique
+    except Exception as e:
+        logger.debug(f"__NEXT_DATA__ parse failed: {e}")
+    return []
+
+
 def _extract_json_ld(soup) -> list[dict]:
     for script in soup.find_all("script", type="application/ld+json"):
         try:
@@ -197,23 +237,38 @@ class ZaraScraper(BaseScraper):
                 except Exception as e:
                     logger.warning(f"Zara API [{section_key}] failed ({e}), falling back to HTML")
 
-            # 2. Fallback: HTML scraping
+            # 2. Fallback: HTML scraping — use premium proxy to bypass Cloudflare
             soup = None
-            for wait_ms in [6000, 10000]:
+            for wait_ms, use_premium in [(6000, False), (8000, True)]:
                 try:
-                    soup = await fetch_page(url, country="es", wait=wait_ms)
+                    soup = await fetch_page(url, country="es", wait=wait_ms, premium=use_premium)
                     break
                 except Exception:
-                    logger.warning(f"Zara [{section_key}] HTML retry with wait={wait_ms}ms")
+                    logger.warning(f"Zara [{section_key}] HTML retry (premium={use_premium}, wait={wait_ms}ms)")
 
             if not soup:
                 logger.error(f"Zara [{section_key}] failed after retries: {url}")
                 continue
 
             try:
-                parsed = _parse_zara_html(soup, section_key)
-                products.extend(parsed)
-                logger.info(f"Zara HTML [{section_key}]: {len(parsed)} products")
+                # Try __NEXT_DATA__ first (full product data with prices)
+                next_items = _extract_next_data(soup)
+                if next_items:
+                    for p in next_items[:40]:
+                        if p.get("name"):
+                            products.append(ScrapedProduct(
+                                name=p["name"], section=section_key,
+                                price=p.get("price"), currency="EUR",
+                                image_url=p.get("image") or None,
+                                product_url=p.get("url") or None,
+                                category="ropa",
+                            ))
+                    logger.info(f"Zara __NEXT_DATA__ [{section_key}]: {len(next_items)} products")
+                else:
+                    # Fall back to HTML grid parsing
+                    parsed = _parse_zara_html(soup, section_key)
+                    products.extend(parsed)
+                    logger.info(f"Zara HTML [{section_key}]: {len(parsed)} products")
             except Exception as e:
                 logger.error(f"Zara [{section_key}] parse error: {e}")
 
