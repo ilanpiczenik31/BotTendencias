@@ -217,27 +217,7 @@ class ZaraScraper(BaseScraper):
         for sec in self.sections:
             url, section_key = sec["url"], sec["key"]
 
-            # 1. Try internal Zara API first — returns prices + images reliably
-            cat_id = _category_id(url)
-            if cat_id:
-                try:
-                    api_items = await _fetch_via_api(cat_id, page_size=40)
-                    if api_items:
-                        for p in api_items[:40]:
-                            if p.get("name"):
-                                products.append(ScrapedProduct(
-                                    name=p["name"], section=section_key,
-                                    price=p.get("price"), currency="EUR",
-                                    image_url=p.get("image") or None,
-                                    product_url=p.get("url") or None,
-                                    category="ropa",
-                                ))
-                        logger.info(f"Zara API [{section_key}]: {len(api_items)} products")
-                        continue
-                except Exception as e:
-                    logger.warning(f"Zara API [{section_key}] failed ({e}), falling back to HTML")
-
-            # 2. Fallback: HTML scraping — use premium proxy to bypass Cloudflare
+            # HTML scraping — try standard first, then premium proxy to bypass Cloudflare
             soup = None
             for wait_ms, use_premium in [(6000, False), (8000, True)]:
                 try:
