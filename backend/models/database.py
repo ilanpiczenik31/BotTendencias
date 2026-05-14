@@ -134,13 +134,13 @@ async def seed_stores():
             ]
         ),
         Store(
-            name="COS",
-            url="https://www.cos.com/es_es/",
+            name="& Other Stories",
+            url="https://www.stories.com/es_es/",
             country="Sweden",
             active=True,
             sections=[
-                {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.cos.com/es_es/women/new-arrivals.html"},
-                {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.cos.com/es_es/men/new-arrivals.html"},
+                {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.stories.com/es_es/women/new-arrivals.html"},
+                {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.stories.com/es_es/men/new-arrivals.html"},
             ]
         ),
     ]

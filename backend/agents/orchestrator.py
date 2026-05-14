@@ -10,7 +10,7 @@ from models.database import (
 )
 from scrapers.zara import ZaraScraper
 from scrapers.hm import HMScraper
-from scrapers.cos import COSScraper
+from scrapers.stories import StoriesScraper
 from agents.analyzer import analyze_store_trends, generate_weekly_report
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 SCRAPER_CLASSES = {
     "Zara": ZaraScraper,
     "H&M": HMScraper,
-    "COS": COSScraper,
+    "& Other Stories": StoriesScraper,
 }
 
 

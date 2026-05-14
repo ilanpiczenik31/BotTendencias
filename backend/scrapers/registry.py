@@ -13,9 +13,9 @@ REGISTRY: dict[str, list[dict]] = {
         {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www2.hm.com/es_es/mujer/novedades/ver-todo.html"},
         {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www2.hm.com/es_es/hombre/novedades/ver-todo.html"},
     ],
-    "COS": [
-        {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.cos.com/es_es/women/new-arrivals.html"},
-        {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.cos.com/es_es/men/new-arrivals.html"},
+    "& Other Stories": [
+        {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.stories.com/es_es/women/new-arrivals.html"},
+        {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.stories.com/es_es/men/new-arrivals.html"},
     ],
 }
 

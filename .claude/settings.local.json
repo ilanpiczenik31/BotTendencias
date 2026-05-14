@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --no-src-dir --import-alias \"@/*\" --yes)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(gh auth *)",
+      "Bash(git add *)",
+      "Bash(git remote *)",
+      "Bash(git push *)",
+      "Bash(git commit *)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "WebFetch(domain:bottendencias-production.up.railway.app)",
+      "Read(//c/Users/ilanp/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/22e0dcbe-bb6d-431c-a6f8-92dddd699948/e4750343-c058-4e90-a2c8-fd73cd1edf76/skills/docx/**)",
+      "Bash(node make_docs.js)",
+      "Bash(ls \"C:\\\\Users\\\\ilanp\\\\\" 2>/dev/null | head -20)",
+      "Bash(ls /mnt/c/Users/ilanp/ 2>/dev/null | head -20)",
+      "WebFetch(domain:www.bershka.com)",
+      "WebFetch(domain:www.springfield.com)",
+      "WebFetch(domain:www.jcrew.com)",
+      "WebFetch(domain:www.thenorthface.com)",
+      "WebFetch(domain:shop.mango.com)",
+      "Bash(railway --version)",
+      "Bash(curl -X DELETE https://bottendencias-production.up.railway.app/api/runs)",
+      "Bash(powershell -Command \"Invoke-WebRequest -Uri 'https://bottendencias-production.up.railway.app/api/runs' -Method DELETE | Select-Object -ExpandProperty Content\")"
+    ]
+  }
+}
