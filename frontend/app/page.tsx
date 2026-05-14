@@ -5,15 +5,12 @@ import { api, Stats, Report, Run } from "@/lib/api";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
-import {
-  Play, RefreshCw, TrendingUp, Package, Store, Clock,
-  ArrowRight, Sparkles, CheckCircle, XCircle, Loader2, Settings2,
-} from "lucide-react";
+import { Play, RefreshCw, Settings2, CheckCircle, XCircle, Loader2, ArrowRight, TrendingUp } from "lucide-react";
 import RunConfigModal from "@/components/RunConfigModal";
 
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
-  const [report, setReport] = useState<Report | null>(null);
+  const [reports, setReports] = useState<Report[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
   const [triggering, setTriggering] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -21,16 +18,20 @@ export default function Dashboard() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isRunning = stats?.last_run_status === "running" || stats?.last_run_status === "pending";
+  const current = reports[0] ?? null;
+  const previous = reports[1] ?? null;
 
   async function loadData(silent = false) {
     if (!silent) setLoading(true);
     try {
-      const [s, r, rs] = await Promise.allSettled([
-        api.getStats(), api.getLatestReport(), api.getRuns(5),
+      const [s, rs, ru] = await Promise.allSettled([
+        api.getStats(),
+        api.getReports(2),
+        api.getRuns(5),
       ]);
       if (s.status === "fulfilled") setStats(s.value);
-      if (r.status === "fulfilled") setReport(r.value);
-      if (rs.status === "fulfilled") setRuns(rs.value);
+      if (rs.status === "fulfilled") setReports(rs.value);
+      if (ru.status === "fulfilled") setRuns(ru.value);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -47,151 +48,143 @@ export default function Dashboard() {
 
   useEffect(() => { loadData(); }, []);
 
-  async function handleTrigger(config?: { store: string; sections: any[] }[] | null) {
+  async function handleTrigger(config?: any) {
     setShowConfig(false);
     setTriggering(true);
     try {
       await api.triggerRun(config ?? undefined);
       setTimeout(() => loadData(true), 3000);
-    } catch { /* ignore */ }
+    } catch { }
     finally { setTriggering(false); }
   }
 
   return (
-    <div className="space-y-8">
-      {showConfig && (
-        <RunConfigModal onClose={() => setShowConfig(false)} onTrigger={handleTrigger} />
-      )}
+    <div className="space-y-6">
+      {showConfig && <RunConfigModal onClose={() => setShowConfig(false)} onTrigger={handleTrigger} />}
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-white">Tendencias Europa</h1>
-          <p className="text-neutral-500 mt-0.5 text-sm">Zara · H&M — actualizado cada lunes.</p>
+          <h1 className="text-xl font-bold text-white">Dashboard</h1>
+          <p className="text-neutral-600 text-sm mt-0.5">Zara · H&M — actualizado cada lunes</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => loadData()} disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm text-neutral-400 transition-colors disabled:opacity-50">
-            <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Actualizar
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-sm text-neutral-400 hover:text-white transition-colors disabled:opacity-50">
+            <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Actualizar
           </button>
           <button onClick={() => setShowConfig(true)} disabled={triggering || isRunning}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm text-neutral-300 transition-colors disabled:opacity-50">
-            <Settings2 size={13} /> Configurar
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-sm text-neutral-300 hover:text-white transition-colors disabled:opacity-50">
+            <Settings2 size={12} /> Configurar
           </button>
           <button onClick={() => handleTrigger(null)} disabled={triggering || isRunning}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white hover:bg-neutral-100 text-sm text-neutral-900 font-semibold transition-colors disabled:opacity-60">
-            <Play size={13} fill="currentColor" />
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-white text-neutral-900 text-sm font-semibold hover:bg-neutral-100 transition-colors disabled:opacity-60">
+            <Play size={12} fill="currentColor" />
             {triggering ? "Iniciando..." : "Correr ahora"}
           </button>
         </div>
       </div>
 
-      {/* Status banner */}
+      {/* Status */}
       {isRunning && (
-        <div className="rounded-lg bg-blue-950/50 border border-blue-800/40 px-4 py-3 flex items-center gap-3">
-          <Loader2 size={15} className="animate-spin text-blue-400 shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm text-blue-300 font-medium">Corrida en progreso...</p>
-            <p className="text-xs text-blue-600 mt-0.5">Scrapeando Zara y H&M. Se actualiza cada 10 segundos.</p>
-          </div>
-        </div>
-      )}
-      {!isRunning && stats?.last_run_status === "completed" && runs[0]?.status === "completed" && (
-        <div className="rounded-lg bg-emerald-950/40 border border-emerald-800/30 px-4 py-3 flex items-center gap-3">
-          <CheckCircle size={15} className="text-emerald-500 shrink-0" />
-          <p className="text-sm text-emerald-400">
-            Última corrida completada —{" "}
-            {stats.last_run_date ? format(new Date(stats.last_run_date), "dd MMM · HH:mm", { locale: es }) : ""}
-          </p>
+        <div className="rounded-lg bg-blue-950/40 border border-blue-800/30 px-4 py-3 flex items-center gap-3">
+          <Loader2 size={14} className="animate-spin text-blue-400 shrink-0" />
+          <p className="text-sm text-blue-300">Corrida en progreso — se actualiza cada 10 segundos</p>
         </div>
       )}
       {!isRunning && stats?.last_run_status === "failed" && (
         <div className="rounded-lg bg-red-950/40 border border-red-800/30 px-4 py-3 flex items-center gap-3">
-          <XCircle size={15} className="text-red-500 shrink-0" />
-          <p className="text-sm text-red-400">La última corrida falló. Revisá los logs en Railway.</p>
+          <XCircle size={14} className="text-red-500 shrink-0" />
+          <p className="text-sm text-red-400">La última corrida falló</p>
         </div>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard icon={<Clock size={15} />} label="Corridas" value={stats?.total_runs ?? "—"} />
-        <StatCard icon={<Package size={15} />} label="Productos" value={stats?.total_products?.toLocaleString("es") ?? "—"} />
-        <StatCard icon={<Store size={15} />} label="Tiendas" value={stats?.total_stores ?? "—"} />
-        <StatCard
-          icon={<TrendingUp size={15} />} label="Último run"
-          value={stats?.last_run_date ? format(new Date(stats.last_run_date), "dd MMM", { locale: es }) : "—"}
-          sub={stats?.last_run_status}
-        />
+      {/* Stats strip */}
+      <div className="grid grid-cols-4 gap-3">
+        {[
+          { label: "Corridas", value: stats?.total_runs ?? "—" },
+          { label: "Productos", value: stats?.total_products?.toLocaleString("es") ?? "—" },
+          { label: "Tiendas activas", value: stats?.total_stores ?? "—" },
+          {
+            label: "Última corrida",
+            value: stats?.last_run_date ? format(new Date(stats.last_run_date), "dd MMM", { locale: es }) : "—",
+            sub: stats?.last_run_status,
+          },
+        ].map((s) => (
+          <div key={s.label} className="rounded-xl bg-neutral-900 border border-neutral-800/60 px-4 py-3">
+            <p className="text-xs text-neutral-600 mb-1">{s.label}</p>
+            <p className="text-xl font-bold text-white">{s.value}</p>
+            {s.sub && <p className="text-xs text-neutral-600 capitalize mt-0.5">{s.sub}</p>}
+          </div>
+        ))}
       </div>
 
-      {/* Latest report */}
-      {report ? (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-white flex items-center gap-2">
-              <Sparkles size={15} className="text-amber-400" /> Esta semana
-            </h2>
-            <span className="text-xs text-neutral-600">
-              {format(new Date(report.run_date), "EEEE d 'de' MMMM", { locale: es })}
-            </span>
-          </div>
-
-          <p className="text-neutral-400 leading-relaxed text-sm">{report.summary}</p>
-
-          {/* Top 3 productos */}
-          {report.top_trends?.top_products && report.top_trends.top_products.length > 0 && (
-            <div className="rounded-xl border border-amber-800/30 bg-amber-950/20 p-4 space-y-3">
-              <p className="text-xs font-semibold text-amber-400 uppercase tracking-widest">Top productos de la semana</p>
-              <div className="space-y-2">
-                {report.top_trends.top_products.slice(0, 3).map((product, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <span className="text-lg font-bold text-amber-600 w-6 shrink-0">{i + 1}</span>
-                    <span className="text-sm text-amber-100/90">{product}</span>
+      {/* Esta semana vs semana anterior */}
+      {current ? (
+        <div className="grid md:grid-cols-2 gap-4">
+          {/* Esta semana */}
+          <div className="rounded-xl border border-neutral-800/60 bg-neutral-900/50 p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-neutral-500 uppercase tracking-widest">Esta semana</p>
+              <span className="text-xs text-neutral-600">
+                {format(new Date(current.run_date), "dd MMM", { locale: es })}
+              </span>
+            </div>
+            <p className="text-sm text-neutral-300 leading-relaxed">{current.summary}</p>
+            {current.top_trends?.top_products && current.top_trends.top_products.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-xs text-neutral-600 uppercase tracking-widest">Top productos</p>
+                {current.top_trends.top_products.slice(0, 3).map((p, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-amber-600 w-4">{i + 1}</span>
+                    <span className="text-sm text-neutral-300">{p}</span>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-
-          {/* Trends grid */}
-          <div className="grid sm:grid-cols-3 gap-4">
-            <TrendPills title="Colores" items={report.top_trends?.colors?.slice(0, 3)} pill="bg-pink-950 text-pink-300" />
-            <TrendPills title="Estilos" items={report.top_trends?.styles?.slice(0, 3)} pill="bg-purple-950 text-purple-300" />
-            <TrendPills title="Prendas" items={report.top_trends?.categories?.slice(0, 3)} pill="bg-blue-950 text-blue-300" />
-          </div>
-
-          {/* Argentina recommendation */}
-          {report.comparison_vs_prev?.argentina_recommendation && (
-            <div className="rounded-lg bg-neutral-900 border border-neutral-700/60 p-4">
-              <p className="text-xs font-semibold text-neutral-500 uppercase tracking-widest mb-1.5">Para Argentina</p>
-              <p className="text-sm text-neutral-300 leading-relaxed">{report.comparison_vs_prev.argentina_recommendation}</p>
-            </div>
-          )}
-
-          {/* Store highlights */}
-          {report.comparison_vs_prev?.store_highlights && report.comparison_vs_prev.store_highlights.length > 0 && (
-            <div className="grid sm:grid-cols-2 gap-2">
-              {report.comparison_vs_prev.store_highlights.map((h, i) => (
-                <div key={i} className="rounded-lg bg-neutral-900 border border-neutral-800/60 px-3 py-2.5 text-xs">
-                  <span className="font-semibold text-white">{h.store}</span>
-                  <span className="text-neutral-500"> — {h.highlight}</span>
-                </div>
+            )}
+            <div className="flex flex-wrap gap-1 pt-1">
+              {current.top_trends?.colors?.slice(0, 3).map((c, i) => (
+                <span key={i} className="text-xs bg-pink-950/60 text-pink-400 px-2 py-0.5 rounded-full">{c}</span>
+              ))}
+              {current.top_trends?.styles?.slice(0, 2).map((s, i) => (
+                <span key={i} className="text-xs bg-purple-950/60 text-purple-400 px-2 py-0.5 rounded-full">{s}</span>
               ))}
             </div>
-          )}
+          </div>
 
-          {/* vs last week */}
-          {report.comparison_vs_prev?.vs_last_week && (
-            <p className="text-xs text-neutral-600 italic">{report.comparison_vs_prev.vs_last_week}</p>
-          )}
-
-          <div className="flex gap-4 pt-1">
-            <Link href="/trends" className="flex items-center gap-1 text-sm text-neutral-500 hover:text-white transition-colors">
-              Ver productos <ArrowRight size={13} />
-            </Link>
-            <Link href="/history" className="flex items-center gap-1 text-sm text-neutral-500 hover:text-white transition-colors">
-              Historial <ArrowRight size={13} />
-            </Link>
+          {/* Semana anterior */}
+          <div className="rounded-xl border border-neutral-800/40 bg-neutral-900/30 p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-neutral-600 uppercase tracking-widest">Semana anterior</p>
+              {previous && (
+                <span className="text-xs text-neutral-700">
+                  {format(new Date(previous.run_date), "dd MMM", { locale: es })}
+                </span>
+              )}
+            </div>
+            {previous ? (
+              <>
+                <p className="text-sm text-neutral-500 leading-relaxed">{previous.summary}</p>
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {previous.top_trends?.colors?.slice(0, 3).map((c, i) => (
+                    <span key={i} className="text-xs bg-neutral-800 text-neutral-600 px-2 py-0.5 rounded-full">{c}</span>
+                  ))}
+                  {previous.top_trends?.styles?.slice(0, 2).map((s, i) => (
+                    <span key={i} className="text-xs bg-neutral-800 text-neutral-600 px-2 py-0.5 rounded-full">{s}</span>
+                  ))}
+                </div>
+                {current.comparison_vs_prev?.vs_last_week && (
+                  <div className="rounded-lg bg-neutral-800/60 px-3 py-2 mt-1">
+                    <p className="text-xs text-neutral-500 flex items-center gap-1.5">
+                      <TrendingUp size={11} className="text-emerald-500" />
+                      {current.comparison_vs_prev.vs_last_week}
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-neutral-700">No hay corrida anterior todavía.</p>
+            )}
           </div>
         </div>
       ) : !loading ? (
@@ -201,76 +194,26 @@ export default function Dashboard() {
         </div>
       ) : null}
 
-      {/* Recent runs */}
-      {runs.length > 0 && (
-        <div>
-          <h2 className="text-xs font-semibold text-neutral-600 uppercase tracking-wide mb-3">Corridas recientes</h2>
-          <div className="space-y-1.5">
-            {runs.map((run) => (
-              <Link key={run.id} href={`/runs/${run.id}`}
-                className="flex items-center justify-between rounded-lg bg-neutral-900 border border-neutral-800/60 px-4 py-2.5 hover:border-neutral-700 transition-colors">
-                <div className="flex items-center gap-3">
-                  <StatusDot status={run.status} />
-                  <span className="text-sm text-neutral-300">
-                    {format(new Date(run.run_date), "dd MMM yyyy · HH:mm", { locale: es })}
-                  </span>
-                  <span className="text-xs text-neutral-600">{run.triggered_by}</span>
-                </div>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusStyle(run.status)}`}>
-                  {run.status}
-                </span>
-              </Link>
-            ))}
-          </div>
-          <Link href="/runs" className="mt-3 inline-flex items-center gap-1 text-sm text-neutral-600 hover:text-neutral-400 transition-colors">
-            Ver todas <ArrowRight size={12} />
-          </Link>
+      {/* Para Argentina */}
+      {current?.comparison_vs_prev?.argentina_recommendation && (
+        <div className="rounded-xl border border-neutral-700/40 bg-neutral-900/50 px-5 py-4">
+          <p className="text-xs font-semibold text-neutral-500 uppercase tracking-widest mb-2">Para Argentina</p>
+          <p className="text-sm text-neutral-300 leading-relaxed">{current.comparison_vs_prev.argentina_recommendation}</p>
         </div>
       )}
-    </div>
-  );
-}
 
-function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string | number; sub?: string | null }) {
-  return (
-    <div className="rounded-xl bg-neutral-900 border border-neutral-800/60 p-4">
-      <div className="flex items-center gap-1.5 text-neutral-600 mb-2 text-xs">{icon} {label}</div>
-      <p className="text-2xl font-bold text-white tracking-tight">{value}</p>
-      {sub && <p className="text-xs text-neutral-600 mt-0.5 capitalize">{sub}</p>}
-    </div>
-  );
-}
-
-function TrendPills({ title, items, pill }: { title: string; items?: string[]; pill: string }) {
-  if (!items?.length) return null;
-  return (
-    <div>
-      <p className="text-xs font-semibold text-neutral-600 uppercase tracking-widest mb-2">{title}</p>
-      <div className="flex flex-wrap gap-1">
-        {items.map((t, i) => (
-          <span key={i} className={`text-xs px-2 py-0.5 rounded-full font-medium ${pill}`}>{t}</span>
-        ))}
+      {/* Links */}
+      <div className="flex gap-4">
+        <Link href="/trends" className="flex items-center gap-1 text-sm text-neutral-600 hover:text-white transition-colors">
+          Ver productos <ArrowRight size={12} />
+        </Link>
+        <Link href="/analysis" className="flex items-center gap-1 text-sm text-neutral-600 hover:text-white transition-colors">
+          Ver análisis completo <ArrowRight size={12} />
+        </Link>
+        <Link href="/runs" className="flex items-center gap-1 text-sm text-neutral-600 hover:text-white transition-colors">
+          Historial <ArrowRight size={12} />
+        </Link>
       </div>
     </div>
   );
-}
-
-function StatusDot({ status }: { status: string }) {
-  const c: Record<string, string> = {
-    completed: "bg-emerald-500",
-    running: "bg-blue-400 animate-pulse",
-    failed: "bg-red-500",
-    pending: "bg-yellow-500",
-  };
-  return <span className={`w-1.5 h-1.5 rounded-full ${c[status] ?? "bg-neutral-500"}`} />;
-}
-
-function statusStyle(s: string) {
-  const m: Record<string, string> = {
-    completed: "bg-emerald-950 text-emerald-400",
-    running: "bg-blue-950 text-blue-400",
-    failed: "bg-red-950 text-red-400",
-    pending: "bg-yellow-950 text-yellow-400",
-  };
-  return m[s] ?? "bg-neutral-800 text-neutral-500";
 }

@@ -73,12 +73,19 @@ export interface Section {
   url: string;
 }
 
+export interface StoreSection {
+  key: string;
+  label: string;
+  url: string;
+}
+
 export interface Store {
   id: number;
   name: string;
   url: string;
   country: string;
   active: boolean;
+  sections: StoreSection[];
 }
 
 export interface StoreDiff {
@@ -119,5 +126,11 @@ export const api = {
   getReportByRun: (runId: number) => apiFetch<Report>(`/api/reports/${runId}`),
   getRunDiff: (runId: number) => apiFetch<StoreDiff[]>(`/api/runs/${runId}/diff`),
   getStores: () => apiFetch<Store[]>("/api/stores"),
+  createStore: (data: { name: string; url: string; country: string; sections: StoreSection[] }) =>
+    apiFetch<Store>("/api/stores", { method: "POST", body: JSON.stringify(data) }),
+  updateStore: (id: number, data: Partial<Store>) =>
+    apiFetch<Store>(`/api/stores/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteStore: (id: number) =>
+    apiFetch<{ message: string }>(`/api/stores/${id}`, { method: "DELETE" }),
   getStats: () => apiFetch<Stats>("/api/stats"),
 };

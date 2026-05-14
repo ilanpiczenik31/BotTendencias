@@ -218,14 +218,74 @@ async def get_report_by_run(run_id: int, session: AsyncSession = Depends(get_ses
 
 # ── Stores ────────────────────────────────────────────────────────────────────
 
+class StoreCreate(BaseModel):
+    name: str
+    url: str
+    country: str = "Spain"
+    sections: list[dict] = []
+
+class StoreUpdate(BaseModel):
+    name: str | None = None
+    url: str | None = None
+    country: str | None = None
+    active: bool | None = None
+    sections: list[dict] | None = None
+
+
 @router.get("/stores")
 async def list_stores(session: AsyncSession = Depends(get_session)):
     result = await session.execute(select(Store).order_by(Store.name))
     stores = result.scalars().all()
     return [
-        {"id": s.id, "name": s.name, "url": s.url, "country": s.country, "active": s.active}
+        {"id": s.id, "name": s.name, "url": s.url, "country": s.country,
+         "active": s.active, "sections": s.sections or []}
         for s in stores
     ]
+
+
+@router.post("/stores")
+async def create_store(body: StoreCreate, session: AsyncSession = Depends(get_session)):
+    result = await session.execute(select(Store).where(Store.name == body.name))
+    if result.scalar_one_or_none():
+        raise HTTPException(400, f"Store '{body.name}' already exists")
+    store = Store(name=body.name, url=body.url, country=body.country,
+                  active=True, sections=body.sections)
+    session.add(store)
+    await session.commit()
+    await session.refresh(store)
+    return {"id": store.id, "name": store.name, "url": store.url,
+            "country": store.country, "active": store.active, "sections": store.sections or []}
+
+
+@router.put("/stores/{store_id}")
+async def update_store(store_id: int, body: StoreUpdate,
+                       session: AsyncSession = Depends(get_session)):
+    store = await session.get(Store, store_id)
+    if not store:
+        raise HTTPException(404, "Store not found")
+    if body.name is not None:
+        store.name = body.name
+    if body.url is not None:
+        store.url = body.url
+    if body.country is not None:
+        store.country = body.country
+    if body.active is not None:
+        store.active = body.active
+    if body.sections is not None:
+        store.sections = body.sections
+    await session.commit()
+    return {"id": store.id, "name": store.name, "url": store.url,
+            "country": store.country, "active": store.active, "sections": store.sections or []}
+
+
+@router.delete("/stores/{store_id}")
+async def delete_store(store_id: int, session: AsyncSession = Depends(get_session)):
+    store = await session.get(Store, store_id)
+    if not store:
+        raise HTTPException(404, "Store not found")
+    await session.delete(store)
+    await session.commit()
+    return {"message": "Store deleted"}
 
 
 # ── Dashboard stats ───────────────────────────────────────────────────────────

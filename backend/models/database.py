@@ -34,6 +34,8 @@ class Store(Base):
     url: Mapped[str] = mapped_column(String(500))
     country: Mapped[str] = mapped_column(String(50))
     active: Mapped[bool] = mapped_column(default=True)
+    # sections: [{key, label, url}] — managed via dashboard
+    sections: Mapped[list] = mapped_column(JSON, default=list, server_default="[]")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     products: Mapped[list["Product"]] = relationship(back_populates="store")
@@ -108,22 +110,47 @@ async def init_db():
 
 
 async def seed_stores():
-    stores = [
-        Store(name="Zara", url="https://www.zara.com/es/", country="Spain"),
-        Store(name="H&M", url="https://www2.hm.com/es_es/", country="Sweden"),
-        Store(name="Bershka", url="https://www.bershka.com/es/", country="Spain"),
-        Store(name="Springfield", url="https://www.springfield.com/es/", country="Spain"),
-        Store(name="The Sting", url="https://www.the-sting.com/", country="Netherlands"),
-        Store(name="J.Crew", url="https://www.jcrew.com/", country="USA"),
-        Store(name="The North Face", url="https://www.thenorthface.com/en-us/", country="USA"),
-        Store(name="El Corte Inglés", url="https://www.elcorteingles.es/moda/", country="Spain"),
+    """Seed active stores with their sections. Only creates stores that don't exist yet."""
+    default_stores = [
+        Store(
+            name="Zara",
+            url="https://www.zara.com/es/",
+            country="Spain",
+            active=True,
+            sections=[
+                {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.zara.com/es/es/hombre-nuevo-l711.html"},
+                {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.zara.com/es/es/mujer-nuevo-l1180.html"},
+                {"key": "trending_women",     "label": "Trends · Mujer", "url": "https://www.zara.com/es/es/woman-events-l17929.html"},
+            ]
+        ),
+        Store(
+            name="H&M",
+            url="https://www2.hm.com/es_es/",
+            country="Sweden",
+            active=True,
+            sections=[
+                {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www2.hm.com/es_es/mujer/novedades/ver-todo.html"},
+                {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www2.hm.com/es_es/hombre/novedades/ver-todo.html"},
+            ]
+        ),
     ]
     async with AsyncSessionLocal() as session:
-        from sqlalchemy import select
-        for store in stores:
+        from sqlalchemy import select, text
+        # Ensure sections column exists (migration for existing DBs)
+        try:
+            await session.execute(text("ALTER TABLE stores ADD COLUMN IF NOT EXISTS sections JSON DEFAULT '[]'"))
+            await session.commit()
+        except Exception:
+            pass
+
+        for store in default_stores:
             result = await session.execute(select(Store).where(Store.name == store.name))
-            if not result.scalar_one_or_none():
+            existing = result.scalar_one_or_none()
+            if not existing:
                 session.add(store)
+            elif not existing.sections:
+                # Backfill sections for existing stores
+                existing.sections = store.sections
         await session.commit()
 
 

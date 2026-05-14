@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, Run, TrendAnalysis, Product, Store, StoreDiff } from "@/lib/api";
+import { api, Run, Product, Store, StoreDiff } from "@/lib/api";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ExternalLink, TrendingUp, TrendingDown } from "lucide-react";
@@ -19,8 +19,6 @@ export default function TrendsPage() {
   const [selectedRun, setSelectedRun] = useState<Run | null>(null);
   const [stores, setStores] = useState<Store[]>([]);
   const [selectedStore, setSelectedStore] = useState<number | null>(null);
-  const [selectedSection, setSelectedSection] = useState("");
-  const [analyses, setAnalyses] = useState<TrendAnalysis[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [diff, setDiff] = useState<StoreDiff[]>([]);
   const [activeTab, setActiveTab] = useState<"products" | "novedades">("products");
@@ -40,26 +38,19 @@ export default function TrendsPage() {
     if (!selectedRun) return;
     setLoadingData(true);
     Promise.all([
-      api.getRunAnalyses(selectedRun.id),
       api.getRunProducts(selectedRun.id, selectedStore ?? undefined),
       api.getRunDiff(selectedRun.id),
-    ]).then(([a, p, d]) => { setAnalyses(a); setProducts(p); setDiff(d); })
+    ]).then(([p, d]) => { setProducts(p); setDiff(d); })
       .finally(() => setLoadingData(false));
   }, [selectedRun, selectedStore]);
-
-  const analysis = selectedStore
-    ? analyses.find(a => a.store_id === selectedStore)
-    : null;
 
   const sectionCounts = products.reduce((acc, p) => {
     acc[p.section] = (acc[p.section] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
-  // Sections that actually have products, in display order
   const availableSections = SECTION_ORDER.filter(s => sectionCounts[s] > 0);
 
-  // Auto-select first available section when products load
   const currentSection = activeSection && availableSections.includes(activeSection)
     ? activeSection
     : availableSections[0] ?? "";
@@ -70,41 +61,42 @@ export default function TrendsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Tendencias</h1>
-        <p className="text-neutral-500 mt-0.5 text-sm">Productos y análisis por tienda.</p>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-xl font-bold text-white">Productos</h1>
+          <p className="text-neutral-600 text-sm mt-0.5">Productos scrapeados por corrida y tienda</p>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <select
+            value={selectedRun?.id ?? ""}
+            onChange={e => setSelectedRun(runs.find(r => r.id === Number(e.target.value)) ?? null)}
+            className="bg-neutral-900 border border-neutral-800 text-neutral-200 text-sm rounded-lg px-3 py-2 focus:outline-none">
+            {runs.filter(r => r.status === "completed").map(r => (
+              <option key={r.id} value={r.id}>
+                {format(new Date(r.run_date), "dd MMM yyyy · HH:mm", { locale: es })}
+              </option>
+            ))}
+          </select>
+          {selectedRun && (
+            <span className="text-xs text-neutral-600">{products.length} productos</span>
+          )}
+        </div>
       </div>
 
-      {/* Run selector */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <select
-          value={selectedRun?.id ?? ""}
-          onChange={e => setSelectedRun(runs.find(r => r.id === Number(e.target.value)) ?? null)}
-          className="bg-neutral-800 border border-neutral-700/60 text-neutral-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-neutral-500"
-        >
-          {runs.filter(r => r.status === "completed").map(r => (
-            <option key={r.id} value={r.id}>
-              {format(new Date(r.run_date), "dd MMM yyyy · HH:mm", { locale: es })}
-            </option>
-          ))}
-        </select>
-        {selectedRun && (
-          <span className="text-xs text-neutral-600">{products.length} productos</span>
-        )}
-      </div>
-
-      {/* Store tabs */}
+      {/* Store filter */}
       <div className="flex flex-wrap gap-2">
-        <FilterTab active={!selectedStore} onClick={() => setSelectedStore(null)}>Todas</FilterTab>
+        <FilterTab active={!selectedStore} onClick={() => { setSelectedStore(null); setActiveSection(""); }}>
+          Todas
+        </FilterTab>
         {stores.map(s => (
-          <FilterTab key={s.id} active={selectedStore === s.id} onClick={() => setSelectedStore(selectedStore === s.id ? null : s.id)}>
+          <FilterTab key={s.id} active={selectedStore === s.id}
+            onClick={() => { setSelectedStore(selectedStore === s.id ? null : s.id); setActiveSection(""); }}>
             {s.name}
           </FilterTab>
         ))}
       </div>
 
-
-      {/* Tabs */}
+      {/* Products / Novedades tabs */}
       <div className="flex gap-1 border-b border-neutral-800">
         <TabBtn active={activeTab === "products"} onClick={() => setActiveTab("products")}>
           Productos
@@ -125,19 +117,6 @@ export default function TrendsPage() {
         <DiffSection diff={diff} />
       ) : (
         <>
-          {/* Analysis for selected store */}
-          {analysis && <AnalysisCard analysis={analysis} />}
-
-          {/* All store analyses when no store selected */}
-          {!selectedStore && analyses.length > 0 && (
-            <div className="grid md:grid-cols-2 gap-3">
-              {analyses.map(a => (
-                <StoreAnalysisMini key={a.store} analysis={a}
-                  onClick={() => setSelectedStore(stores.find(s => s.name === a.store)?.id ?? null)} />
-              ))}
-            </div>
-          )}
-
           {/* Section tabs */}
           {availableSections.length > 0 && (
             <div className="space-y-4">
@@ -196,93 +175,6 @@ function FilterTab({ active, onClick, children }: { active: boolean; onClick: ()
   );
 }
 
-function StoreAnalysisMini({ analysis, onClick }: { analysis: TrendAnalysis; onClick: () => void }) {
-  return (
-    <button onClick={onClick}
-      className="text-left rounded-xl border border-neutral-800/60 bg-neutral-900/50 p-4 hover:border-neutral-600 transition-all hover:bg-neutral-900 space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-white text-sm">{analysis.store}</h3>
-        {analysis.trends.trend_score != null && (
-          <span className="text-xs bg-neutral-800 text-neutral-400 px-2 py-0.5 rounded-full">
-            {analysis.trends.trend_score}/10
-          </span>
-        )}
-      </div>
-      <p className="text-xs text-neutral-500 leading-relaxed line-clamp-2">{analysis.summary}</p>
-      {analysis.trends.top_products && analysis.trends.top_products.length > 0 && (
-        <div className="space-y-1">
-          {analysis.trends.top_products.slice(0, 3).map((p, i) => (
-            <p key={i} className="text-xs text-neutral-400">
-              <span className="text-neutral-600 mr-1">{i + 1}.</span>{p}
-            </p>
-          ))}
-        </div>
-      )}
-      {analysis.trends.colors && (
-        <div className="flex flex-wrap gap-1">
-          {analysis.trends.colors.slice(0, 3).map((c, i) => (
-            <span key={i} className="text-xs bg-pink-950/60 text-pink-400 px-1.5 py-0.5 rounded-full">{c}</span>
-          ))}
-        </div>
-      )}
-    </button>
-  );
-}
-
-function AnalysisCard({ analysis }: { analysis: TrendAnalysis }) {
-  return (
-    <div className="rounded-xl border border-neutral-800/60 bg-neutral-900/50 p-5 space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-white">{analysis.store}</h2>
-        {analysis.trends.trend_score != null && (
-          <span className="text-sm bg-neutral-800 text-neutral-300 px-3 py-1 rounded-full">
-            {analysis.trends.trend_score}/10
-          </span>
-        )}
-      </div>
-      <p className="text-neutral-400 text-sm leading-relaxed">{analysis.summary}</p>
-
-      {analysis.trends.top_products && analysis.trends.top_products.length > 0 && (
-        <div className="rounded-lg bg-amber-950/20 border border-amber-800/30 p-3 space-y-2">
-          <p className="text-xs font-semibold text-amber-500 uppercase tracking-widest">Top productos</p>
-          {analysis.trends.top_products.slice(0, 3).map((p, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <span className="text-sm font-bold text-amber-600 w-4">{i + 1}</span>
-              <span className="text-sm text-amber-100/80">{p}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="grid sm:grid-cols-3 gap-4">
-        <PillGroup title="Colores" tags={analysis.trends.colors?.slice(0, 3)} cls="bg-pink-950/60 text-pink-400" />
-        <PillGroup title="Estilos" tags={analysis.trends.styles?.slice(0, 3)} cls="bg-purple-950/60 text-purple-400" />
-        <PillGroup title="Prendas" tags={analysis.trends.categories?.slice(0, 3)} cls="bg-blue-950/60 text-blue-400" />
-      </div>
-
-      {analysis.trends.price_range?.min != null && analysis.trends.price_range?.max != null && (
-        <p className="text-xs text-neutral-600">
-          Precio: <span className="text-neutral-400 font-medium">
-            {analysis.trends.price_range.min} – {analysis.trends.price_range.max} {analysis.trends.price_range.currency}
-          </span>
-        </p>
-      )}
-    </div>
-  );
-}
-
-function PillGroup({ title, tags, cls }: { title: string; tags?: string[]; cls: string }) {
-  if (!tags?.length) return null;
-  return (
-    <div>
-      <p className="text-xs font-semibold text-neutral-600 uppercase tracking-widest mb-2">{title}</p>
-      <div className="flex flex-wrap gap-1">
-        {tags.map((t, i) => <span key={i} className={`text-xs px-2 py-0.5 rounded-full font-medium ${cls}`}>{t}</span>)}
-      </div>
-    </div>
-  );
-}
-
 function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button onClick={onClick}
@@ -307,9 +199,8 @@ function DiffSection({ diff }: { diff: StoreDiff[] }) {
 
   return (
     <div className="space-y-6">
-      {diff.map(d => (
+      {diff.map((d, idx) => (
         <div key={d.store_id} className="space-y-4">
-          {/* Store header */}
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-white">{d.store}</h3>
             <div className="flex items-center gap-3 text-xs text-neutral-600">
@@ -318,7 +209,6 @@ function DiffSection({ diff }: { diff: StoreDiff[] }) {
             </div>
           </div>
 
-          {/* Summary chips */}
           <div className="flex gap-2 flex-wrap">
             {d.new_count > 0 && (
               <span className="flex items-center gap-1 text-xs bg-emerald-950 text-emerald-400 px-2.5 py-1 rounded-full font-medium">
@@ -335,7 +225,6 @@ function DiffSection({ diff }: { diff: StoreDiff[] }) {
             )}
           </div>
 
-          {/* New products */}
           {d.new_products.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-emerald-500 uppercase tracking-widest mb-3">
@@ -347,7 +236,6 @@ function DiffSection({ diff }: { diff: StoreDiff[] }) {
             </div>
           )}
 
-          {/* Removed products */}
           {d.removed_products.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-red-500 uppercase tracking-widest mb-3">
@@ -359,7 +247,7 @@ function DiffSection({ diff }: { diff: StoreDiff[] }) {
             </div>
           )}
 
-          {d !== diff[diff.length - 1] && <div className="border-t border-neutral-800/60" />}
+          {idx < diff.length - 1 && <div className="border-t border-neutral-800/60" />}
         </div>
       ))}
     </div>

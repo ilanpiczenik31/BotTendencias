@@ -10,7 +10,6 @@ from models.database import (
 )
 from scrapers.zara import ZaraScraper
 from scrapers.hm import HMScraper
-from scrapers.registry import REGISTRY
 from agents.analyzer import analyze_store_trends, generate_weekly_report
 
 logger = logging.getLogger(__name__)
@@ -19,9 +18,6 @@ SCRAPER_CLASSES = {
     "Zara": ZaraScraper,
     "H&M": HMScraper,
 }
-
-# Scrapers that accept custom sections (others use their default SECTIONS list)
-DYNAMIC_SCRAPERS = {"Zara", "Bershka"}
 
 
 async def run_pipeline(
@@ -97,11 +93,9 @@ async def _scrape_store(run_id: int, store: Store, sections: list[dict] | None):
 
     logger.info(f"Scraping {store.name}...")
 
-    # Pass custom sections to scrapers that support it
-    if sections and store.name in DYNAMIC_SCRAPERS:
-        scraper = scraper_class(sections=sections)
-    else:
-        scraper = scraper_class()
+    # Use custom_config sections, then store's DB sections, then scraper defaults
+    active_sections = sections or (store.sections if store.sections else None)
+    scraper = scraper_class(sections=active_sections) if active_sections else scraper_class()
 
     products = await scraper.scrape()
 
