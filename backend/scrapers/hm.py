@@ -1,5 +1,5 @@
 import json
-from .base import BaseScraper, ScrapedProduct, fetch_page
+from .base import BaseScraper, ScrapedProduct, fetch_page, fetch_page_static
 from .registry import REGISTRY
 import logging
 
@@ -92,13 +92,22 @@ class HMScraper(BaseScraper):
             url, section_key = sec["url"], sec["key"]
             soup = None
 
-            # Try standard first, then premium — no scroll (causes 500s)
-            for wait_ms, use_premium in [(5000, False), (8000, True)]:
-                try:
-                    soup = await fetch_page(url, country="es", wait=wait_ms, premium=use_premium)
-                    break
-                except Exception:
-                    logger.warning(f"H&M [{section_key}] retry (premium={use_premium})")
+            # 1. Try static (no render) — H&M has SSR, JSON-LD is in the raw HTML
+            #    Much harder to block than a full headless Chrome session
+            soup = await fetch_page_static(url, country="es")
+            if soup:
+                test = _parse_hm_jld(soup, section_key)
+                if not test:
+                    soup = None  # got HTML but no products, try with render
+
+            # 2. Fall back to rendered page if static had no products
+            if not soup:
+                for wait_ms, use_premium in [(5000, False), (8000, True)]:
+                    try:
+                        soup = await fetch_page(url, country="es", wait=wait_ms, premium=use_premium)
+                        break
+                    except Exception:
+                        logger.warning(f"H&M [{section_key}] render retry (premium={use_premium})")
 
             if not soup:
                 logger.error(f"H&M [{section_key}] failed: {url}")
