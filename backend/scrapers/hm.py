@@ -1,25 +1,18 @@
 import json
 from .base import BaseScraper, ScrapedProduct, fetch_page
+from .registry import REGISTRY
 import logging
 
 logger = logging.getLogger(__name__)
 
 BASE = "https://www2.hm.com"
 
-SECTIONS = [
-    ("https://www2.hm.com/es_es/mujer/novedades/ver-todo.html",  "new_arrivals_women"),
-    ("https://www2.hm.com/es_es/hombre/novedades/ver-todo.html", "new_arrivals_men"),
-]
 
-
-def _parse_hm(soup, section_key: str) -> list[ScrapedProduct]:
+def _parse_hm_jld(soup, section_key: str) -> list[ScrapedProduct]:
     """
-    H&M uses obfuscated CSS classes — can't use selectors.
-    1. JSON-LD ItemList → names, images, prices, urls
-    2. a[href*=productpage] → product URLs by position if JSON-LD has no URLs
-    3. Fallback: img[alt] from image.hm.com + links
+    Extract products from H&M JSON-LD (schema.org ItemList).
+    H&M includes 20-60 products in SSR JSON-LD with names, images, prices and URLs.
     """
-    # 1. JSON-LD
     jld_products = []
     for script in soup.find_all("script", type="application/ld+json"):
         try:
@@ -37,17 +30,22 @@ def _parse_hm(soup, section_key: str) -> list[ScrapedProduct]:
                     url = offers.get("url") or item.get("url", "")
                     if url and not url.startswith("http"):
                         url = BASE + url
-                    jld_products.append({
-                        "name": item.get("name", "").strip(),
-                        "image": image,
-                        "price": float(price) if price is not None else None,
-                        "currency": offers.get("priceCurrency", "EUR"),
-                        "url": url,
-                    })
+                    name = item.get("name", "").strip()
+                    if name:
+                        jld_products.append({
+                            "name": name,
+                            "image": image or None,
+                            "price": float(price) if price is not None else None,
+                            "currency": offers.get("priceCurrency", "EUR"),
+                            "url": url or None,
+                        })
         except Exception:
             pass
 
-    # 2. Product page links from HTML (hrefs are NOT obfuscated)
+    if not jld_products:
+        return []
+
+    # Enrich with product page URLs from HTML (not obfuscated)
     seen_links: set[str] = set()
     product_links: list[str] = []
     for a in soup.find_all("a", href=True):
@@ -58,42 +56,25 @@ def _parse_hm(soup, section_key: str) -> list[ScrapedProduct]:
                 seen_links.add(full)
                 product_links.append(full)
 
-    logger.debug(f"H&M [{section_key}]: {len(jld_products)} JSON-LD products, {len(product_links)} links")
-
-    # 3. Merge
-    results = []
-    if jld_products:
-        for i, p in enumerate(jld_products[:60]):
-            if not p["name"]:
-                continue
-            url = p["url"] or (product_links[i] if i < len(product_links) else None)
-            results.append(ScrapedProduct(
-                name=p["name"], section=section_key,
-                price=p["price"], currency=p["currency"],
-                image_url=p["image"] or None,
-                product_url=url or None,
-                category="ropa",
-            ))
-        return results
-
-    # Fallback: img alt + links by position
-    imgs = []
-    for img in soup.find_all("img"):
-        src = img.get("src", "")
-        alt = img.get("alt", "").strip()
-        if "image.hm.com" in src and alt and len(alt) > 3:
-            name = alt.split("-")[0].strip()
-            if name:
-                imgs.append({"name": name, "image": src})
-
-    for i, p in enumerate(imgs[:60]):
-        url = product_links[i] if i < len(product_links) else None
+    results: list[ScrapedProduct] = []
+    seen_names: set[str] = set()
+    for i, p in enumerate(jld_products):
+        if len(results) >= 20:
+            break
+        key = p["name"].strip().lower()
+        if key in seen_names:
+            continue
+        seen_names.add(key)
+        url = p["url"] or (product_links[i] if i < len(product_links) else None)
         results.append(ScrapedProduct(
             name=p["name"], section=section_key,
-            image_url=p["image"], product_url=url,
+            price=p["price"], currency=p["currency"],
+            image_url=p["image"],
+            product_url=url,
             category="ropa",
         ))
 
+    logger.debug(f"H&M [{section_key}]: {len(jld_products)} JSON-LD → {len(results)} unique")
     return results
 
 
@@ -101,14 +82,33 @@ class HMScraper(BaseScraper):
     store_name = "H&M"
     store_url = "https://www2.hm.com/es_es/"
 
+    def __init__(self, sections: list[dict] | None = None):
+        self.sections = sections or REGISTRY["H&M"]
+
     async def _scrape(self) -> list[ScrapedProduct]:
         products: list[ScrapedProduct] = []
-        for url, section in SECTIONS:
-            try:
-                soup = await fetch_page(url, country="es", wait=5000, scroll=True)
-                parsed = _parse_hm(soup, section)
+
+        for sec in self.sections:
+            url, section_key = sec["url"], sec["key"]
+            soup = None
+
+            # Try standard first, then premium — no scroll (causes 500s)
+            for wait_ms, use_premium in [(5000, False), (8000, True)]:
+                try:
+                    soup = await fetch_page(url, country="es", wait=wait_ms, premium=use_premium)
+                    break
+                except Exception:
+                    logger.warning(f"H&M [{section_key}] retry (premium={use_premium})")
+
+            if not soup:
+                logger.error(f"H&M [{section_key}] failed: {url}")
+                continue
+
+            parsed = _parse_hm_jld(soup, section_key)
+            if parsed:
                 products.extend(parsed)
-                logger.info(f"H&M [{section}]: {len(parsed)} products")
-            except Exception as e:
-                logger.error(f"H&M {url}: {e}")
+                logger.info(f"H&M [{section_key}]: {len(parsed)} products (all with image+price)")
+            else:
+                logger.warning(f"H&M [{section_key}]: 0 products — JSON-LD empty")
+
         return products
