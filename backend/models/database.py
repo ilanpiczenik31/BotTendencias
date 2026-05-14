@@ -144,13 +144,13 @@ async def seed_stores():
             ]
         ),
         Store(
-            name="Pull&Bear",
-            url="https://www.pullandbear.com/es/",
-            country="Spain",
+            name="ASOS",
+            url="https://www.asos.com/es/",
+            country="UK",
             active=True,
             sections=[
-                {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.pullandbear.com/es/hombre/novedades-n6280"},
-                {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.pullandbear.com/es/mujer/novedades-n1009"},
+                {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.asos.com/es/mujer/novedades/cat/?cid=2623"},
+                {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.asos.com/es/hombre/novedades/cat/?cid=27108"},
             ]
         ),
     ]

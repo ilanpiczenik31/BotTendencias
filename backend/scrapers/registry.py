@@ -21,6 +21,10 @@ REGISTRY: dict[str, list[dict]] = {
         {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.pullandbear.com/es/hombre/novedades-n6280"},
         {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.pullandbear.com/es/mujer/novedades-n1009"},
     ],
+    "ASOS": [
+        {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.asos.com/es/mujer/novedades/cat/?cid=2623"},
+        {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.asos.com/es/hombre/novedades/cat/?cid=27108"},
+    ],
 }
 
 
