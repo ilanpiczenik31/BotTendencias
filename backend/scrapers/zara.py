@@ -217,11 +217,19 @@ class ZaraScraper(BaseScraper):
         for sec in self.sections:
             url, section_key = sec["url"], sec["key"]
 
-            # HTML scraping — try standard first, then premium proxy to bypass Cloudflare
+            # HTML scraping — try standard first, then premium to bypass Cloudflare
             soup = None
             for wait_ms, use_premium in [(6000, False), (8000, True)]:
                 try:
                     soup = await fetch_page(url, country="es", wait=wait_ms, premium=use_premium)
+                    # Quick check: if page loaded but has no products, retry with premium
+                    if soup and not use_premium:
+                        test_jld = _extract_json_ld(soup)
+                        test_html = _parse_zara_html(soup, section_key)
+                        if not test_jld and not test_html:
+                            logger.warning(f"Zara [{section_key}] page loaded but empty, retrying with premium")
+                            soup = None
+                            continue
                     break
                 except Exception:
                     logger.warning(f"Zara [{section_key}] HTML retry (premium={use_premium}, wait={wait_ms}ms)")
@@ -265,10 +273,19 @@ class ZaraScraper(BaseScraper):
                             "url": p.get("url") or None,
                         }
 
-                # Start with HTML products (up to 20), enrich with JSON-LD
+                # Build merged list — 20 unique products per section
+                # HTML gives the full list (names + URLs), JSON-LD enriches with price + image
                 merged: list[ScrapedProduct] = []
-                for p in html_items[:20]:
-                    enriched = jld_by_name.get(p.name.strip().lower(), {})
+                seen_names: set[str] = set()
+
+                for p in html_items:
+                    if len(merged) >= 20:
+                        break
+                    key = p.name.strip().lower()
+                    if key in seen_names:
+                        continue
+                    seen_names.add(key)
+                    enriched = jld_by_name.get(key, {})
                     merged.append(ScrapedProduct(
                         name=p.name, section=section_key,
                         price=enriched.get("price"),
@@ -278,24 +295,27 @@ class ZaraScraper(BaseScraper):
                         category="ropa",
                     ))
 
-                # If HTML had fewer than 20, fill remaining from JSON-LD names not yet included
-                existing_names = {p.name.strip().lower() for p in merged}
+                # Fill remaining slots from JSON-LD if HTML had fewer than 20 unique
                 for p in jld_items:
                     if len(merged) >= 20:
                         break
-                    if p.get("name") and p["name"].strip().lower() not in existing_names:
-                        image = p.get("image", "")
-                        if isinstance(image, list):
-                            image = image[0] if image else ""
-                        merged.append(ScrapedProduct(
-                            name=p["name"], section=section_key,
-                            price=float(p["price"]) if p.get("price") else None,
-                            currency=p.get("currency", "EUR"),
-                            image_url=image or None,
-                            product_url=p.get("url") or None,
-                            category="ropa",
-                        ))
-                        existing_names.add(p["name"].strip().lower())
+                    if not p.get("name"):
+                        continue
+                    key = p["name"].strip().lower()
+                    if key in seen_names:
+                        continue
+                    seen_names.add(key)
+                    image = p.get("image", "")
+                    if isinstance(image, list):
+                        image = image[0] if image else ""
+                    merged.append(ScrapedProduct(
+                        name=p["name"], section=section_key,
+                        price=float(p["price"]) if p.get("price") else None,
+                        currency=p.get("currency", "EUR"),
+                        image_url=image or None,
+                        product_url=p.get("url") or None,
+                        category="ropa",
+                    ))
 
                 products.extend(merged)
                 logger.info(
