@@ -1,6 +1,6 @@
 import json
 import re
-from .base import BaseScraper, ScrapedProduct, fetch_page, fetch_json, fetch_json_direct, parse_price
+from .base import BaseScraper, ScrapedProduct, fetch_page, fetch_page_static, fetch_json, fetch_json_direct, parse_price
 from .registry import REGISTRY
 import logging
 
@@ -159,6 +159,78 @@ def _parse_zara_html(soup, section_key: str) -> list[ScrapedProduct]:
     return results
 
 
+def _extract_ssr_products(soup) -> list[dict]:
+    """
+    Extract products from server-side rendered state.
+    Tries multiple patterns: __NEXT_DATA__, window.__STATE__, inline JSON with product arrays.
+    Returns list of {name, image, price, currency, url} dicts.
+    """
+    import re as _re
+
+    # Pattern 1: Next.js __NEXT_DATA__
+    script = soup.find("script", id="__NEXT_DATA__")
+    if script and script.string:
+        try:
+            data = json.loads(script.string)
+            results = _walk_for_products(data)
+            if results:
+                logger.info(f"Zara SSR __NEXT_DATA__: found {len(results)} products")
+                return results
+        except Exception:
+            pass
+
+    # Pattern 2: Any <script> containing product arrays (look for large JSON blobs)
+    for script in soup.find_all("script"):
+        txt = script.string or ""
+        if len(txt) < 500 or "name" not in txt:
+            continue
+        # Look for patterns like window.__STATE__ = {...} or window.catalog = [...]
+        for pattern in [
+            r'window\.__[A-Z_]+\s*=\s*({.+?});?\s*</script>',
+            r'window\.[a-zA-Z]+\s*=\s*(\[.+?\]);?\s*</script>',
+        ]:
+            m = _re.search(pattern, txt, _re.DOTALL)
+            if m:
+                try:
+                    data = json.loads(m.group(1))
+                    results = _walk_for_products(data)
+                    if results:
+                        logger.info(f"Zara SSR window state: found {len(results)} products")
+                        return results
+                except Exception:
+                    pass
+
+    return []
+
+
+def _walk_for_products(obj, depth: int = 0, _seen: set | None = None) -> list[dict]:
+    """Walk a JSON structure looking for Zara product objects."""
+    if _seen is None:
+        _seen = set()
+    if depth > 12 or not isinstance(obj, (dict, list)):
+        return []
+    obj_id = id(obj)
+    if obj_id in _seen:
+        return []
+    _seen.add(obj_id)
+
+    results = []
+    if isinstance(obj, list):
+        for item in obj[:200]:
+            results.extend(_walk_for_products(item, depth + 1, _seen))
+    elif isinstance(obj, dict):
+        name = str(obj.get("name", "")).strip()
+        # Looks like a Zara product: has a name + (price OR xmedia OR seo keyword)
+        if len(name) > 3 and ("price" in obj or "xmedia" in obj or "seo" in obj or "mainImgUrl" in obj):
+            parsed = _parse_zara_product(obj)
+            if parsed:
+                results.extend(parsed)
+                return results  # Don't recurse into product objects
+        for v in obj.values():
+            results.extend(_walk_for_products(v, depth + 1, _seen))
+    return results
+
+
 def _extract_next_data(soup) -> list[dict]:
     """Extract products from Next.js __NEXT_DATA__ embedded JSON."""
     script = soup.find("script", id="__NEXT_DATA__")
@@ -232,7 +304,38 @@ class ZaraScraper(BaseScraper):
         for sec in self.sections:
             url, section_key = sec["url"], sec["key"]
 
-            # HTML scraping — try standard first, then premium to bypass Cloudflare
+            # Step 1: Try static SSR fetch (no JS rendering) — fastest, returns __NEXT_DATA__
+            static_soup = await fetch_page_static(url, country="es")
+            if static_soup:
+                ssr_items = _extract_ssr_products(static_soup)
+                if ssr_items:
+                    sec_products: list[ScrapedProduct] = []
+                    seen_n: set[str] = set()
+                    for p in ssr_items:
+                        if len(sec_products) >= 20:
+                            break
+                        if not p.get("name"):
+                            continue
+                        key = p["name"].strip().lower()
+                        if key in seen_n:
+                            continue
+                        seen_n.add(key)
+                        image = p.get("image", "")
+                        if isinstance(image, list):
+                            image = image[0] if image else ""
+                        sec_products.append(ScrapedProduct(
+                            name=p["name"], section=section_key,
+                            price=p.get("price"), currency="EUR",
+                            image_url=image or None,
+                            product_url=p.get("url") or None,
+                            category="ropa",
+                        ))
+                    if sec_products:
+                        products.extend(sec_products)
+                        logger.info(f"Zara SSR [{section_key}]: {len(sec_products)} products")
+                        continue
+
+            # Step 2: Rendered HTML — try standard first, then premium+scroll
             soup = None
             for wait_ms, use_premium, use_scroll in [(6000, False, False), (8000, True, True)]:
                 try:

@@ -50,6 +50,24 @@ async def fetch_json_direct(url: str, extra_headers: dict | None = None) -> dict
     return None
 
 
+async def fetch_page_static(url: str, country: str = "es") -> BeautifulSoup | None:
+    """Fetch raw SSR HTML via ScraperAPI (no JS rendering). Faster and returns SSR state."""
+    params = {
+        "api_key": SCRAPER_API_KEY,
+        "url": url,
+        "country_code": country,
+    }
+    async with _semaphore:
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.get(SCRAPER_API_BASE, params=params)
+                if resp.status_code == 200:
+                    return BeautifulSoup(resp.text, "lxml")
+        except Exception as e:
+            logger.debug(f"fetch_page_static failed: {e}")
+    return None
+
+
 async def fetch_json(url: str, country: str = "es") -> dict | list | None:
     """Fetch a JSON endpoint through ScraperAPI without browser rendering."""
     params = {
