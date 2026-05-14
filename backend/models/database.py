@@ -133,6 +133,16 @@ async def seed_stores():
                 {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www2.hm.com/es_es/hombre/novedades/ver-todo.html"},
             ]
         ),
+        Store(
+            name="Mango",
+            url="https://shop.mango.com/es/",
+            country="Spain",
+            active=True,
+            sections=[
+                {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://shop.mango.com/es/mujer/novedades"},
+                {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://shop.mango.com/es/hombre/novedades"},
+            ]
+        ),
     ]
     async with AsyncSessionLocal() as session:
         from sqlalchemy import select, text
