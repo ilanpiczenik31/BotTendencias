@@ -54,6 +54,18 @@ async def list_runs(limit: int = 20, session: AsyncSession = Depends(get_session
     ]
 
 
+@router.delete("/runs")
+async def delete_all_runs(session: AsyncSession = Depends(get_session)):
+    """Delete all runs and related data (products, analyses, reports)."""
+    from sqlalchemy import delete as sql_delete
+    await session.execute(sql_delete(TrendAnalysis))
+    await session.execute(sql_delete(WeeklyReport))
+    await session.execute(sql_delete(Product))
+    await session.execute(sql_delete(WeeklyRun))
+    await session.commit()
+    return {"message": "All runs deleted"}
+
+
 @router.post("/runs/{run_id}/cancel")
 async def cancel_run(run_id: int, session: AsyncSession = Depends(get_session)):
     from datetime import datetime

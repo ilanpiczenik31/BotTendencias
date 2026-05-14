@@ -94,15 +94,15 @@ export default function StoresPage() {
               <div key={i} className="grid grid-cols-[1fr_1fr_2fr_auto] gap-2">
                 <input value={sec.key} onChange={e => {
                   const s = [...newSections]; s[i] = { ...s[i], key: e.target.value }; setNewSections(s);
-                }} placeholder="Key (ej: new_women)"
+                }} placeholder="Key — ID interno (ej: new_women)"
                   className="bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none" />
                 <input value={sec.label} onChange={e => {
                   const s = [...newSections]; s[i] = { ...s[i], label: e.target.value }; setNewSections(s);
-                }} placeholder="Label (ej: Nuevo · Mujer)"
+                }} placeholder="Label — nombre visible (ej: Nuevo · Mujer)"
                   className="bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none" />
                 <input value={sec.url} onChange={e => {
                   const s = [...newSections]; s[i] = { ...s[i], url: e.target.value }; setNewSections(s);
-                }} placeholder="URL de la sección"
+                }} placeholder="URL — link de la sección a scrapear"
                   className="bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none" />
                 <button onClick={() => setNewSections(newSections.filter((_, j) => j !== i))}
                   className="text-neutral-600 hover:text-red-400 transition-colors">
@@ -196,15 +196,15 @@ function StoreCard({
             <div key={i} className="grid grid-cols-[1fr_1fr_2fr_auto] gap-2">
               <input value={sec.key} onChange={e => {
                 const s = [...sections]; s[i] = { ...s[i], key: e.target.value }; setSections(s);
-              }} placeholder="Key"
+              }} placeholder="Key — ID interno (ej: new_women)"
                 className="bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none" />
               <input value={sec.label} onChange={e => {
                 const s = [...sections]; s[i] = { ...s[i], label: e.target.value }; setSections(s);
-              }} placeholder="Label"
+              }} placeholder="Label — nombre visible (ej: Nuevo · Mujer)"
                 className="bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none" />
               <input value={sec.url} onChange={e => {
                 const s = [...sections]; s[i] = { ...s[i], url: e.target.value }; setSections(s);
-              }} placeholder="URL"
+              }} placeholder="URL — link de la sección a scrapear"
                 className="bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none" />
               <button onClick={() => setSections(sections.filter((_, j) => j !== i))}
                 className="text-neutral-600 hover:text-red-400 transition-colors">
