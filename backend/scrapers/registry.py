@@ -17,6 +17,10 @@ REGISTRY: dict[str, list[dict]] = {
         {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.stories.com/es_es/women/new-arrivals.html"},
         {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.stories.com/es_es/men/new-arrivals.html"},
     ],
+    "Pull&Bear": [
+        {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.pullandbear.com/es/hombre/novedades-n6280"},
+        {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.pullandbear.com/es/mujer/novedades-n1009"},
+    ],
 }
 
 

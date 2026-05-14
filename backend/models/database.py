@@ -143,6 +143,16 @@ async def seed_stores():
                 {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.stories.com/es_es/men/new-arrivals.html"},
             ]
         ),
+        Store(
+            name="Pull&Bear",
+            url="https://www.pullandbear.com/es/",
+            country="Spain",
+            active=True,
+            sections=[
+                {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.pullandbear.com/es/hombre/novedades-n6280"},
+                {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.pullandbear.com/es/mujer/novedades-n1009"},
+            ]
+        ),
     ]
     async with AsyncSessionLocal() as session:
         from sqlalchemy import select, text
