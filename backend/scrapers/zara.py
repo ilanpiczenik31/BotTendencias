@@ -1,6 +1,6 @@
 import json
 import re
-from .base import BaseScraper, ScrapedProduct, fetch_page, fetch_json, fetch_json_direct
+from .base import BaseScraper, ScrapedProduct, fetch_page, fetch_json, fetch_json_direct, parse_price
 from .registry import REGISTRY
 import logging
 
@@ -110,33 +110,48 @@ def _parse_zara_html(soup, section_key: str) -> list[ScrapedProduct]:
                 product_url = "https://www.zara.com" + product_url
 
         for img in item.find_all("img"):
-            # src may be empty due to lazy loading — also check data-src and srcset
             src = img.get("src", "") or img.get("data-src", "")
             srcset = img.get("srcset", "") or img.get("data-srcset", "")
             alt = img.get("alt", "").strip()
 
-            # Pick best URL: prefer src, then first entry in srcset
             best_src = src
             if not best_src and srcset:
                 best_src = srcset.split(",")[0].strip().split(" ")[0]
 
-            # Strategy 1: transparent-background img has product name ("NAME - Color de Zara")
-            if "transparent-background" in best_src and alt and " de Zara" in alt and "Imagen de producto" not in alt:
+            # Strategy 1: transparent-background img → product name in alt
+            if "transparent-background" in (best_src or "") and alt and " de Zara" in alt and "Imagen de producto" not in alt:
                 candidate = alt.split(" - ")[0].strip()
                 if len(candidate) > 3:
                     name = candidate
 
-            # Real product image (static.zara.net JPG)
+            # Real product image
             if not image_url and best_src and ".jpg" in best_src and "static.zara.net" in best_src and "stdstatic" not in best_src:
                 image_url = best_src
 
-        # Strategy 2: extract from URL slug if no name found yet
+        # Strategy 2: extract name from URL slug
         if not name and product_url:
             name = _name_from_url(product_url)
+
+        # Extract price from rendered HTML
+        price = None
+        for price_sel in [
+            "[class*='price__amount']", "[class*='price-current__amount']",
+            "[class*='money-amount__main']", "[data-price]",
+            "[class*='product-price']", "[class*='price'] span",
+        ]:
+            try:
+                el = item.select_one(price_sel)
+                if el:
+                    price = parse_price(el.get_text(strip=True))
+                    if price:
+                        break
+            except Exception:
+                pass
 
         if name:
             results.append(ScrapedProduct(
                 name=name, section=section_key,
+                price=price, currency="EUR",
                 image_url=image_url, product_url=product_url,
                 category="ropa",
             ))
@@ -219,9 +234,9 @@ class ZaraScraper(BaseScraper):
 
             # HTML scraping — try standard first, then premium to bypass Cloudflare
             soup = None
-            for wait_ms, use_premium in [(6000, False), (8000, True)]:
+            for wait_ms, use_premium, use_scroll in [(6000, False, False), (8000, True, True)]:
                 try:
-                    soup = await fetch_page(url, country="es", wait=wait_ms, premium=use_premium)
+                    soup = await fetch_page(url, country="es", wait=wait_ms, premium=use_premium, scroll=use_scroll)
                     # Quick check: if page loaded but has no products, retry with premium
                     if soup and not use_premium:
                         test_jld = _extract_json_ld(soup)
