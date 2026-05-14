@@ -17,16 +17,29 @@ def _category_id(url: str) -> str | None:
 
 
 async def _fetch_via_api(category_id: str, page_size: int = 40) -> list[dict]:
-    """Call Zara's internal AJAX API to get products directly (no proxy needed for JSON)."""
-    api_url = (
-        f"https://www.zara.com/es/es/category/{category_id}/products"
-        f"?ajax=true&page=0&pageSize={page_size}&sortBy=newest"
-    )
-    # Try direct call first (no ScraperAPI — Zara's JSON API works with browser headers)
-    data = await fetch_json_direct(api_url, extra_headers={"Referer": "https://www.zara.com/es/es/"})
-    if not data:
-        # Fallback through ScraperAPI proxy
-        data = await fetch_json(api_url, country="es")
+    """
+    Call Zara/Inditex catalog API (used by mobile app) — returns full product list
+    with images and prices, no browser rendering needed.
+    Tries multiple known endpoint formats.
+    """
+    endpoints = [
+        # Inditex mobile app API (Spain store: 44009503)
+        f"https://www.zara.com/itxrest/2/catalog/store/44009503/productlist/?languageId=-26&appId=1&listId={category_id}&view=APPAREL&pageSize={page_size}",
+        f"https://www.zara.com/itxrest/2/catalog/store/44009503/productlist/?languageId=-26&appId=1&listId={category_id}&pageSize={page_size}",
+        # Older AJAX endpoint
+        f"https://www.zara.com/es/es/category/{category_id}/products?ajax=true&page=0&pageSize={page_size}&sortBy=newest",
+    ]
+    headers = {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15",
+        "Accept": "application/json",
+        "Accept-Language": "es-ES,es;q=0.9",
+        "Referer": "https://www.zara.com/es/es/",
+    }
+    for url in endpoints:
+        data = await fetch_json_direct(url, extra_headers=headers)
+        if data:
+            logger.info(f"Zara API hit: {url[:80]}")
+            break
     if not data:
         return []
 
@@ -304,7 +317,38 @@ class ZaraScraper(BaseScraper):
         for sec in self.sections:
             url, section_key = sec["url"], sec["key"]
 
-            # Step 1: Try static SSR fetch (no JS rendering) — fastest, returns __NEXT_DATA__
+            # Step 1: Try Inditex mobile API — all products with image+price, no browser needed
+            cat_id = _category_id(url)
+            if cat_id:
+                try:
+                    api_items = await _fetch_via_api(cat_id, page_size=20)
+                    if api_items:
+                        sec_products: list[ScrapedProduct] = []
+                        seen_n: set[str] = set()
+                        for p in api_items:
+                            if len(sec_products) >= 20:
+                                break
+                            if not p.get("name"):
+                                continue
+                            key = p["name"].strip().lower()
+                            if key in seen_n:
+                                continue
+                            seen_n.add(key)
+                            sec_products.append(ScrapedProduct(
+                                name=p["name"], section=section_key,
+                                price=p.get("price"), currency="EUR",
+                                image_url=p.get("image") or None,
+                                product_url=p.get("url") or None,
+                                category="ropa",
+                            ))
+                        if sec_products:
+                            products.extend(sec_products)
+                            logger.info(f"Zara API [{section_key}]: {len(sec_products)} products")
+                            continue
+                except Exception as e:
+                    logger.debug(f"Zara API [{section_key}] error: {e}")
+
+            # Step 2: Try static SSR fetch (no JS rendering) — fastest, returns __NEXT_DATA__
             static_soup = await fetch_page_static(url, country="es")
             if static_soup:
                 ssr_items = _extract_ssr_products(static_soup)
