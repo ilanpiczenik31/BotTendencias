@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, Section } from "@/lib/api";
+import { api, Section, Store } from "@/lib/api";
 import { X, Play, CheckSquare, Square, ChevronDown, ChevronRight } from "lucide-react";
 
 interface StoreConfig {
@@ -21,9 +21,11 @@ export default function RunConfigModal({ onClose, onTrigger }: Props) {
   const [mode, setMode] = useState<"all" | "custom">("all");
 
   useEffect(() => {
-    api.getRegistry().then(data => {
+    // Use DB stores (includes stores added via UI), filter active only
+    api.getStores().then(stores => {
+      const active = stores.filter(s => s.active && s.sections?.length > 0);
+      const data = active.map(s => ({ store: s.name, sections: s.sections as Section[] }));
       setRegistry(data);
-      // Default: all selected
       const initial: Record<string, Set<string>> = {};
       data.forEach(({ store, sections }) => {
         initial[store] = new Set(sections.map(s => s.key));
