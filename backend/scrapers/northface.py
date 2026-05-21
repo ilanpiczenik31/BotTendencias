@@ -19,61 +19,49 @@ def _parse_tnf_html(soup, section_key: str) -> list[ScrapedProduct]:
     results = []
     seen: set[str] = set()
 
-    # Products are stored as: "ProductName","/es-es/p/category/url-CODE?color=X"
-    product_pattern = re.compile(
-        r'"([^"]{10,80})","/es-es/p/([^"?]+(?:\?[^"]{0,50})?)"'
-    )
-
-    # Also collect images: product codes like NF0A8GBTBOM appear in image URLs
-    # Image pattern: /CODE-HERO/ in assets.thenorthface.eu URLs
+    # Build image map: full SKU (e.g. NF0A8GBTBOM) → image URL
+    # Pattern: /NF0A8GBTBOM-HERO/ in assets.thenorthface.eu image paths
     img_map: dict[str, str] = {}
-    img_pattern = re.compile(
-        r'(https://assets\.thenorthface\.eu/images/[^"]+/([A-Z0-9]{8,12})-HERO/[^"]+\.jpg)'
-    )
-    for m in img_pattern.finditer(html):
-        img_url, code = m.group(1), m.group(2)
-        if code not in img_map:
-            img_map[code] = img_url
+    for m in re.finditer(
+        r'(https://assets\.thenorthface\.eu/images/[^"]+/([A-Z0-9]{10,12})-HERO/[^"]+\.jpg)',
+        html
+    ):
+        sku = m.group(2)
+        if sku not in img_map:
+            img_map[sku] = m.group(1)
 
-    # Collect prices: EUR formatted prices in the page
-    price_pattern = re.compile(r'(\d{2,3})[,.](\d{2})\s*€|€\s*(\d{2,3})[,.](\d{2})')
+    # Collect EUR prices in order of appearance
     all_prices = []
-    for m in price_pattern.finditer(html):
-        if m.group(1):
-            all_prices.append(float(f"{m.group(1)}.{m.group(2)}"))
-        else:
-            all_prices.append(float(f"{m.group(3)}.{m.group(4)}"))
+    for m in re.finditer(r'(\d{2,3})[,.](\d{2})\s*€|€\s*(\d{2,3})[,.](\d{2})', html):
+        val = float(f"{m.group(1)}.{m.group(2)}") if m.group(1) else float(f"{m.group(3)}.{m.group(4)}")
+        all_prices.append(val)
 
-    # Extract products
+    # Products: full SKU (10-12 chars) then name then /es-es/p/ URL
+    # Pattern: "NF0A8GBTBOM","Product Name","/es-es/p/..."
+    product_pattern = re.compile(
+        r'"([A-Z0-9]{10,12})","([^"]{8,80})","(/es-es/p/[^"]+)"'
+    )
+
+    skip_words = ["mujer", "hombre", "niños", "equipment", "view all", "ver todo",
+                  "este artículo", "available", "disponible"]
     price_idx = 0
+
     for m in product_pattern.finditer(html):
         if len(results) >= 20:
             break
-        name = m.group(1).strip()
-        url_path = m.group(2)
+        sku, name, url_path = m.group(1), m.group(2).strip(), m.group(3)
 
-        # Skip non-product entries (navigation, categories etc.)
-        if len(name) < 8 or any(skip in name.lower() for skip in ["mujer", "hombre", "niños", "equipamiento", "view all", "ver todo"]):
+        if len(name) < 6:
+            continue
+        if any(w in name.lower() for w in skip_words):
             continue
         if name.lower() in seen:
             continue
         seen.add(name.lower())
 
-        product_url = BASE + "/es-es/p/" + url_path
+        product_url = BASE + url_path
+        image_url = img_map.get(sku)  # exact SKU match → correct image per product
 
-        # Extract product code from URL (e.g. NF0A8GBT)
-        code_match = re.search(r'-(NF[A-Z0-9]{6,10})\?', url_path)
-        product_code = code_match.group(1) if code_match else None
-
-        # Find image by product code
-        image_url = None
-        if product_code:
-            for img_code, img_url in img_map.items():
-                if img_code.startswith(product_code):
-                    image_url = img_url
-                    break
-
-        # Assign next available price
         price = all_prices[price_idx] if price_idx < len(all_prices) else None
         price_idx += 1
 
