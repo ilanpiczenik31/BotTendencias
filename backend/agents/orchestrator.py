@@ -13,6 +13,8 @@ from scrapers.hm import HMScraper
 from scrapers.stories import StoriesScraper
 from scrapers.pullandbear import PullAndBearScraper
 from scrapers.asos import ASOSScraper
+from scrapers.northface import NorthFaceScraper
+from scrapers.thesting import TheStingScraper
 from agents.analyzer import analyze_store_trends, generate_weekly_report
 
 logger = logging.getLogger(__name__)
@@ -23,6 +25,8 @@ SCRAPER_CLASSES = {
     "& Other Stories": StoriesScraper,
     "Pull&Bear": PullAndBearScraper,
     "ASOS": ASOSScraper,
+    "The North Face": NorthFaceScraper,
+    "The Sting": TheStingScraper,
 }
 
 

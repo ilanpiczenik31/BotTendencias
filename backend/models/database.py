@@ -134,6 +134,26 @@ async def seed_stores():
             ]
         ),
         Store(
+            name="The North Face",
+            url="https://www.thenorthface.com/es-es/",
+            country="USA",
+            active=True,
+            sections=[
+                {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.thenorthface.com/es-es/c/hombre/novedades-and-tendencias/novedades-226102"},
+                {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.thenorthface.com/es-es/c/mujer/novedades-and-tendencias/novedades-226102"},
+            ]
+        ),
+        Store(
+            name="The Sting",
+            url="https://www.thesting.com/nl-nl/",
+            country="Netherlands",
+            active=True,
+            sections=[
+                {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.thesting.com/nl-nl/dames/new-in", "category_id": "dames-new-in"},
+                {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.thesting.com/nl-nl/heren/new-in", "category_id": "heren-new-in"},
+            ]
+        ),
+        Store(
             name="& Other Stories",
             url="https://www.stories.com/es_es/",
             country="Sweden",

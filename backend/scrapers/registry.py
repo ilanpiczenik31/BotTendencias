@@ -25,6 +25,14 @@ REGISTRY: dict[str, list[dict]] = {
         {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.asos.com/es/mujer/novedades/cat/?cid=2623"},
         {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.asos.com/es/hombre/novedades/cat/?cid=27108"},
     ],
+    "The North Face": [
+        {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.thenorthface.com/es-es/c/hombre/novedades-and-tendencias/novedades-226102"},
+        {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.thenorthface.com/es-es/c/mujer/novedades-and-tendencias/novedades-226102"},
+    ],
+    "The Sting": [
+        {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.thesting.com/nl-nl/dames/new-in", "category_id": "dames-new-in"},
+        {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.thesting.com/nl-nl/heren/new-in", "category_id": "heren-new-in"},
+    ],
 }
 
 
