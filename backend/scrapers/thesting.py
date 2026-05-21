@@ -33,19 +33,15 @@ def _parse_sting_html(html: str, section_key: str) -> list[ScrapedProduct]:
     results = []
     seen: set[str] = set()
 
-    # Build image map from srcset (product_code -> image_url)
+    # Build image map: extract ALL xcdn image URLs from HTML, map by product code
+    # Images appear as: https://thesting.xcdn.nl/439539-ORA_F05.jpg (various _Fxx codes)
+    # Product code = everything before _F (dots converted to dashes in image names)
     img_map: dict[str, str] = {}
-    for img in soup.find_all("img", srcset=True):
-        srcset = img.get("srcset", "")
-        # Extract first URL from srcset
-        first_url = srcset.split("?f=")[0].strip()
-        if "thesting.xcdn.nl" in first_url and ".jpg" in first_url:
-            # Try to find the product ID nearby
-            parent = img.find_parent(attrs={"data-id": True})
-            if parent:
-                pid = parent.get("data-id", "")
-                if pid and pid not in img_map:
-                    img_map[pid] = first_url
+    for m in re.finditer(r'https://thesting\.xcdn\.nl/(\d{6}-[A-Z0-9.-]+)_F\d+\.jpg', html):
+        full_url = m.group(0)
+        img_code = m.group(1)  # e.g. "439539-ORA" or "445412-BLW-D"
+        if img_code not in img_map:
+            img_map[img_code] = full_url
 
     # Also build URL map from href links
     url_map: dict[str, str] = {}
@@ -84,13 +80,10 @@ def _parse_sting_html(html: str, section_key: str) -> list[ScrapedProduct]:
             price = item.get("price")
             currency = item.get("currency", "EUR")
             product_url = url_map.get(pid)
-            image_url = img_map.get(pid)
 
-            # Build image URL from product code: 439539-ORA → 439539-ORA_F10.jpg
-            # Dots in color codes become dashes: 445412-BLW.D → 445412-BLW-D_F10.jpg
-            if not image_url and pid and not pid.startswith("campaign"):
-                img_code = pid.replace(".", "-")
-                image_url = f"https://thesting.xcdn.nl/{img_code}_F10.jpg"
+            # Look up image: product ID uses dots (BLW.D), image map uses dashes (BLW-D)
+            img_code = pid.replace(".", "-")
+            image_url = img_map.get(img_code) or img_map.get(pid)
 
             results.append(ScrapedProduct(
                 name=name,
