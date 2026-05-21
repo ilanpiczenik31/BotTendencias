@@ -42,8 +42,10 @@ def _parse_tnf_html(soup, section_key: str) -> list[ScrapedProduct]:
         r'"([A-Z0-9]{10,12})","([^"]{8,80})","(/es-es/p/[^"]+)"'
     )
 
-    skip_words = ["mujer", "hombre", "niños", "equipment", "view all", "ver todo",
-                  "este artículo", "available", "disponible"]
+    # Only skip actual navigation/UI strings, NOT product names containing "mujer"/"hombre"
+    skip_exact = {"view all", "ver todo", "new arrivals", "novedades"}
+    skip_contains = ["este artículo", "this product", "only available", "solo está disponible",
+                     "disponible online y en"]
     price_idx = 0
 
     for m in product_pattern.finditer(html):
@@ -53,7 +55,9 @@ def _parse_tnf_html(soup, section_key: str) -> list[ScrapedProduct]:
 
         if len(name) < 6:
             continue
-        if any(w in name.lower() for w in skip_words):
+        if name.lower() in skip_exact:
+            continue
+        if any(w in name.lower() for w in skip_contains):
             continue
         if name.lower() in seen:
             continue
