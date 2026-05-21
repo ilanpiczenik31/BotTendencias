@@ -4,7 +4,6 @@ Products are embedded in a JSON data layer in the HTML.
 Paginates to fetch ~50 products per section.
 """
 import re
-import json
 from .base import BaseScraper, ScrapedProduct, fetch_page_static
 from .registry import REGISTRY
 import logging
@@ -20,56 +19,43 @@ def _parse_eci_html(html: str, section_key: str) -> list[ScrapedProduct]:
     results = []
     seen: set[str] = set()
 
-    # Find the products JSON array in the data layer
-    # Pattern: "products":[{"brand":...,"code_a":...,"id":...,"name":...,"price":{...}}]
-    products_match = re.search(r'"products":\[(\{.+?\})\s*[,\]]', html, re.DOTALL)
-    if not products_match:
+    # Pattern confirmed working: name then price.f_price in same object
+    name_price = re.findall(
+        r'"name":"([^"]{3,80})","price":\{"currency":"([^"]+)"[^}]*?"f_price":([\d.]+)',
+        html
+    )
+    if not name_price:
         return []
 
-    # Find ALL product objects in the full products array
-    # Each product has: code_a, id, name, price.f_price
-    product_pattern = re.compile(
-        r'"code_a":"([^"]+)"[^}]*?"id":"(\d+)"[^}]*?"(?:media|name)"[^}]*?"name":"([^"]{3,80})"'
-        r'[^}]*?"price":\{"currency":"([^"]+)"[^}]*?"f_price":([\d.]+)',
-        re.DOTALL
-    )
+    # code_a appears before each product (same count, same order)
+    code_a_list = re.findall(r'"code_a":"([^"]+)"', html)
 
-    # Build product URL map from href links
+    # Product IDs (12-18 digit strings)
+    id_list = re.findall(r'"id":"(\d{12,18})"', html)
+
+    # Build product URL map from href links: /moda-mujer/A57120359-slug/
     url_map: dict[str, str] = {}
-    for m in re.finditer(r'href="(/[^"]*?/([A-Z][0-9]{7,})[^"]*?)"', html):
-        href, code = m.group(1), m.group(2)
-        clean_url = href.split("?")[0]  # Remove query params
+    for m in re.finditer(r'href="(/[^"]*?/([A-Z][0-9]{7,})[^"?]*)', html):
+        code = m.group(2)
         if code not in url_map:
-            url_map[code] = BASE + clean_url
+            url_map[code] = BASE + m.group(1)
 
-    for m in product_pattern.finditer(html):
-        code_a, prod_id, name, currency, f_price = (
-            m.group(1), m.group(2), m.group(3).strip(),
-            m.group(4), m.group(5)
-        )
-
-        if not name or name.lower() in seen:
-            continue
-        # Skip category navigation items
-        if len(name) < 4:
+    for i, (name, currency, f_price) in enumerate(name_price):
+        name = name.strip()
+        if not name or len(name) < 4 or name.lower() in seen:
             continue
         seen.add(name.lower())
 
-        image_url = IMG_BASE.format(id=prod_id)
-        product_url = url_map.get(code_a)
-
-        try:
-            price = float(f_price)
-        except Exception:
-            price = None
+        code_a = code_a_list[i] if i < len(code_a_list) else None
+        prod_id = id_list[i] if i < len(id_list) else None
 
         results.append(ScrapedProduct(
             name=name,
             section=section_key,
-            price=price,
+            price=float(f_price) if f_price else None,
             currency=currency or "EUR",
-            image_url=image_url,
-            product_url=product_url,
+            image_url=IMG_BASE.format(id=prod_id) if prod_id else None,
+            product_url=url_map.get(code_a) if code_a else None,
             category="ropa",
         ))
 
@@ -91,8 +77,8 @@ class ElCorteInglesScraper(BaseScraper):
             section_products: list[ScrapedProduct] = []
             seen_names: set[str] = set()
 
-            # Fetch multiple pages to reach ~50 products
-            for page in range(1, 5):  # pages 1-4 → up to ~96 products
+            # Fetch multiple pages to reach ~50 products (24 per page)
+            for page in range(1, 5):
                 page_url = url if page == 1 else f"{url}?s[page]={page}"
                 soup = await fetch_page_static(page_url, country="es")
                 if not soup:
@@ -101,7 +87,8 @@ class ElCorteInglesScraper(BaseScraper):
 
                 parsed = _parse_eci_html(str(soup), section_key)
                 if not parsed:
-                    break  # No more products
+                    logger.warning(f"El Corte Inglés [{section_key}] page {page}: 0 products parsed")
+                    break
 
                 new_count = 0
                 for p in parsed:
@@ -110,12 +97,10 @@ class ElCorteInglesScraper(BaseScraper):
                         section_products.append(p)
                         new_count += 1
 
-                logger.info(f"El Corte Inglés [{section_key}] page {page}: {new_count} new products (total: {len(section_products)})")
+                logger.info(f"El Corte Inglés [{section_key}] page {page}: {new_count} new (total: {len(section_products)})")
 
-                if len(section_products) >= 50:
+                if len(section_products) >= 50 or new_count == 0:
                     break
-                if new_count == 0:
-                    break  # All products already seen, stop paginating
 
             products.extend(section_products[:50])
             logger.info(f"El Corte Inglés [{section_key}]: {len(section_products[:50])} products total")
