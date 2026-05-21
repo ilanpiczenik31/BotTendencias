@@ -154,26 +154,6 @@ async def seed_stores():
             ]
         ),
         Store(
-            name="The Sting",
-            url="https://www.thesting.com/nl-nl/",
-            country="Netherlands",
-            active=True,
-            sections=[
-                {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.thesting.com/nl-nl/dames/new-in", "category_id": "dames-new-in"},
-                {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.thesting.com/nl-nl/heren/new-in", "category_id": "heren-new-in"},
-            ]
-        ),
-        Store(
-            name="& Other Stories",
-            url="https://www.stories.com/es_es/",
-            country="Sweden",
-            active=True,
-            sections=[
-                {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.stories.com/es_es/women/new-arrivals.html"},
-                {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.stories.com/es_es/men/new-arrivals.html"},
-            ]
-        ),
-        Store(
             name="ASOS",
             url="https://www.asos.com/es/",
             country="UK",
@@ -181,6 +161,16 @@ async def seed_stores():
             sections=[
                 {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.asos.com/es/mujer/novedades/cat/?cid=2623"},
                 {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.asos.com/es/hombre/novedades/cat/?cid=27108"},
+            ]
+        ),
+        Store(
+            name="The Sting",
+            url="https://www.thesting.com/nl-nl/",
+            country="Netherlands",
+            active=True,
+            sections=[
+                {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.thesting.com/nl-nl/dames/new-in", "category_id": "dames-new-in"},
+                {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.thesting.com/nl-nl/heren/new-in", "category_id": "heren-new-in"},
             ]
         ),
     ]
@@ -192,6 +182,14 @@ async def seed_stores():
             await session.commit()
         except Exception:
             pass
+
+        # Deactivate stores that no longer have working scrapers
+        RETIRED_STORES = ["& Other Stories", "Pull&Bear"]
+        for name in RETIRED_STORES:
+            result = await session.execute(select(Store).where(Store.name == name))
+            store = result.scalar_one_or_none()
+            if store and store.active:
+                store.active = False
 
         for store in default_stores:
             result = await session.execute(select(Store).where(Store.name == store.name))

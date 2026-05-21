@@ -10,9 +10,6 @@ from models.database import (
 )
 from scrapers.zara import ZaraScraper
 from scrapers.hm import HMScraper
-from scrapers.stories import StoriesScraper
-from scrapers.pullandbear import PullAndBearScraper
-from scrapers.asos import ASOSScraper
 from scrapers.northface import NorthFaceScraper
 from scrapers.thesting import TheStingScraper
 from scrapers.elcorteingles import ElCorteInglesScraper
@@ -23,9 +20,6 @@ logger = logging.getLogger(__name__)
 SCRAPER_CLASSES = {
     "Zara": ZaraScraper,
     "H&M": HMScraper,
-    "& Other Stories": StoriesScraper,
-    "Pull&Bear": PullAndBearScraper,
-    "ASOS": ASOSScraper,
     "The North Face": NorthFaceScraper,
     "The Sting": TheStingScraper,
     "El Corte Inglés": ElCorteInglesScraper,

@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { api, Run, TrendAnalysis, Product, Report } from "@/lib/api";
+import { api, Run, TrendAnalysis, Product, Report, Store } from "@/lib/api";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, AlertTriangle, CheckCircle2, Package } from "lucide-react";
 
 const SECTION_LABELS: Record<string, string> = {
   new_arrivals_women: "Nuevo · Mujer",
@@ -27,6 +27,7 @@ export default function RunDetailPage() {
   const [analyses, setAnalyses] = useState<TrendAnalysis[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [report, setReport] = useState<Report | null>(null);
+  const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedStore, setSelectedStore] = useState<number | null>(null);
   const [activeSection, setActiveSection] = useState<string>("");
@@ -38,13 +39,21 @@ export default function RunDetailPage() {
       api.getRunAnalyses(runId),
       api.getRunProducts(runId),
       api.getReportByRun(runId),
-    ]).then(([r, a, p, rep]) => {
+      api.getStores(),
+    ]).then(([r, a, p, rep, s]) => {
       if (r.status === "fulfilled") setRun(r.value);
       if (a.status === "fulfilled") setAnalyses(a.value);
       if (p.status === "fulfilled") setProducts(p.value);
       if (rep.status === "fulfilled") setReport(rep.value);
+      if (s.status === "fulfilled") setStores(s.value);
     }).finally(() => setLoading(false));
   }, [runId]);
+
+  // Stores that actually returned products in this run
+  const storesWithProducts = new Set(products.map(p => p.store_id));
+
+  // Active stores that returned 0 products
+  const failedStores = stores.filter(s => s.active && !storesWithProducts.has(s.id));
 
   const storeProducts = selectedStore
     ? products.filter((p) => p.store_id === selectedStore)
@@ -55,10 +64,8 @@ export default function RunDetailPage() {
     return acc;
   }, {} as Record<string, number>);
 
-  // Sections in display order, only ones with products
   const availableSections = [
     ...SECTION_ORDER.filter(s => sectionCounts[s] > 0),
-    // Any sections not in SECTION_ORDER
     ...Object.keys(sectionCounts).filter(s => !SECTION_ORDER.includes(s) && sectionCounts[s] > 0),
   ];
 
@@ -84,6 +91,52 @@ export default function RunDetailPage() {
           {" · "}{run.triggered_by} · <StatusBadge status={run.status} />
         </p>
       </div>
+
+      {/* Store status summary */}
+      {run.status === "completed" && stores.length > 0 && (
+        <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
+          <p className="text-xs font-semibold text-neutral-500 uppercase tracking-widest">Resultado por tienda</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+            {stores.filter(s => s.active).map(store => {
+              const count = products.filter(p => p.store_id === store.id).length;
+              const ok = count > 0;
+              return (
+                <div
+                  key={store.id}
+                  className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 border ${
+                    ok
+                      ? "border-emerald-800/40 bg-emerald-950/20"
+                      : "border-red-800/40 bg-red-950/20"
+                  }`}
+                >
+                  {ok
+                    ? <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                    : <AlertTriangle size={14} className="text-red-400 shrink-0" />
+                  }
+                  <div className="min-w-0">
+                    <p className={`text-xs font-semibold truncate ${ok ? "text-emerald-200" : "text-red-200"}`}>
+                      {store.name}
+                    </p>
+                    <p className={`text-xs ${ok ? "text-emerald-500" : "text-red-500"}`}>
+                      {ok ? `${count} productos` : "No scrapeada"}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {failedStores.length > 0 && (
+            <div className="flex items-start gap-2 bg-red-950/30 border border-red-800/30 rounded-lg px-3 py-2.5">
+              <AlertTriangle size={14} className="text-red-400 mt-0.5 shrink-0" />
+              <p className="text-xs text-red-300 leading-relaxed">
+                <span className="font-semibold">{failedStores.map(s => s.name).join(", ")}</span>
+                {" "}no {failedStores.length === 1 ? "pudo" : "pudieron"} ser {failedStores.length === 1 ? "scrapeada" : "scrapeadas"} en esta corrida.
+                Puede que la tienda haya bloqueado el acceso o que no tenga scraper configurado.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Report */}
       {report && (
@@ -152,7 +205,7 @@ export default function RunDetailPage() {
       )}
 
       {/* Products */}
-      {products.length > 0 && (
+      {products.length > 0 ? (
         <div className="space-y-4">
           {/* Store filter */}
           <div className="flex items-center justify-between flex-wrap gap-3">
@@ -191,7 +244,7 @@ export default function RunDetailPage() {
             </div>
           )}
 
-          {/* Product grid — 20 per section */}
+          {/* Product grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
             {sectionProducts.map((p) => (
               <a key={p.id} href={p.product_url ?? "#"} target="_blank" rel="noopener noreferrer"
@@ -229,6 +282,14 @@ export default function RunDetailPage() {
               </a>
             ))}
           </div>
+        </div>
+      ) : run.status === "completed" && (
+        <div className="flex flex-col items-center justify-center py-16 text-center space-y-3 rounded-xl border border-neutral-800 bg-neutral-900/40">
+          <Package size={32} className="text-neutral-700" />
+          <p className="text-neutral-400 font-medium">No se scrapearon productos en esta corrida</p>
+          <p className="text-neutral-600 text-sm max-w-xs">
+            Ninguna tienda activa pudo ser accedida. Revisá las URLs de las secciones en la página de Tiendas.
+          </p>
         </div>
       )}
     </div>
