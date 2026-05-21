@@ -23,7 +23,7 @@ HEADERS = {
 SFCC_BASE = "https://www.thesting.com/on/demandware.store/Sites-TheSting-Site/nl_NL"
 
 
-def _sfcc_url(category_id: str, sz: int = 24) -> str:
+def _sfcc_url(category_id: str, sz: int = 60) -> str:
     return f"{SFCC_BASE}/Search-ShowAjax?cgid={category_id}&prefn1=eligibleForPLP&prefv1=true&sz={sz}&start=0&sortingRule=new-days-available"
 
 
@@ -70,7 +70,7 @@ def _parse_sting_html(html: str, section_key: str) -> list[ScrapedProduct]:
             continue
 
         for item in items:
-            if len(results) >= 20:
+            if len(results) >= 50:
                 break
             name = item.get("item_name", "").strip()
             if not name or name.lower() in seen:

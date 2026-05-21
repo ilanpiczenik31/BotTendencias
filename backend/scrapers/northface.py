@@ -49,7 +49,7 @@ def _parse_tnf_html(soup, section_key: str) -> list[ScrapedProduct]:
     price_idx = 0
 
     for m in product_pattern.finditer(html):
-        if len(results) >= 20:
+        if len(results) >= 50:
             break
         sku, name, url_path = m.group(1), m.group(2).strip(), m.group(3)
 
