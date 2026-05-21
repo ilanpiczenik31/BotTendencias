@@ -86,10 +86,11 @@ def _parse_sting_html(html: str, section_key: str) -> list[ScrapedProduct]:
             product_url = url_map.get(pid)
             image_url = img_map.get(pid)
 
-            # Fallback image from xcdn with product code
-            if not image_url and pid:
-                base_code = pid.split(".")[0]
-                image_url = f"https://thesting.xcdn.nl/{base_code}.jpg"
+            # Build image URL from product code: 439539-ORA → 439539-ORA_F10.jpg
+            # Dots in color codes become dashes: 445412-BLW.D → 445412-BLW-D_F10.jpg
+            if not image_url and pid and not pid.startswith("campaign"):
+                img_code = pid.replace(".", "-")
+                image_url = f"https://thesting.xcdn.nl/{img_code}_F10.jpg"
 
             results.append(ScrapedProduct(
                 name=name,
