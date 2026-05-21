@@ -134,6 +134,16 @@ async def seed_stores():
             ]
         ),
         Store(
+            name="El Corte Inglés",
+            url="https://www.elcorteingles.es/",
+            country="Spain",
+            active=True,
+            sections=[
+                {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.elcorteingles.es/lo-mas-nuevo/moda-mujer/"},
+                {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.elcorteingles.es/lo-mas-nuevo/moda-hombre/"},
+            ]
+        ),
+        Store(
             name="The North Face",
             url="https://www.thenorthface.com/es-es/",
             country="USA",
