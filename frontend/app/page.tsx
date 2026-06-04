@@ -39,7 +39,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (isRunning) {
-      pollRef.current = setInterval(() => loadData(true), 10000);
+      pollRef.current = setInterval(() => loadData(true), 3000);
     } else {
       if (pollRef.current) clearInterval(pollRef.current);
     }
@@ -66,7 +66,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-bold text-white">Dashboard</h1>
-          <p className="text-neutral-600 text-sm mt-0.5">Zara · H&M — actualizado cada lunes</p>
+          <p className="text-neutral-600 text-sm mt-0.5">Zara · H&M · ASOS · The Sting · más — actualizado cada lunes</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => loadData()} disabled={loading}
@@ -89,7 +89,7 @@ export default function Dashboard() {
       {isRunning && (
         <div className="rounded-lg bg-blue-950/40 border border-blue-800/30 px-4 py-3 flex items-center gap-3">
           <Loader2 size={14} className="animate-spin text-blue-400 shrink-0" />
-          <p className="text-sm text-blue-300">Corrida en progreso — se actualiza cada 10 segundos</p>
+          <p className="text-sm text-blue-300">Corrida en progreso — se actualiza cada 3 segundos</p>
         </div>
       )}
       {!isRunning && stats?.last_run_status === "failed" && (

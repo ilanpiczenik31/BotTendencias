@@ -1,9 +1,16 @@
+import { getToken } from "./auth";
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = getToken();
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
-    headers: { "Content-Type": "application/json", ...options?.headers },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options?.headers,
+    },
   });
   if (!res.ok) throw new Error(`API error ${res.status}: ${await res.text()}`);
   return res.json();
@@ -133,4 +140,9 @@ export const api = {
   deleteStore: (id: number) =>
     apiFetch<{ message: string }>(`/api/stores/${id}`, { method: "DELETE" }),
   getStats: () => apiFetch<Stats>("/api/stats"),
+  login: (password: string) =>
+    apiFetch<{ token: string; ok: boolean }>("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    }),
 };
