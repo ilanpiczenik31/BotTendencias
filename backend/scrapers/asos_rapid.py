@@ -50,10 +50,26 @@ def _parse_product(item: dict, section_key: str) -> ScrapedProduct | None:
     full_name = f"{brand} — {name}" if brand and brand.lower() not in name.lower() else name
 
     raw_image = item.get("imageUrl") or ""
-    image_url = ("https:" + raw_image) if raw_image.startswith("//") else (raw_image or None)
+    if raw_image:
+        if raw_image.startswith("http"):
+            image_url = raw_image + "?$n_480w$"
+        elif raw_image.startswith("//"):
+            image_url = "https:" + raw_image + "?$n_480w$"
+        else:
+            image_url = "https://" + raw_image + "?$n_480w$"
+    else:
+        image_url = None
 
     raw_url = item.get("url") or ""
-    product_url = (PRODUCT_BASE + raw_url) if raw_url.startswith("/") else (raw_url or None)
+    if raw_url:
+        if raw_url.startswith("http"):
+            product_url = raw_url
+        elif raw_url.startswith("/"):
+            product_url = PRODUCT_BASE + raw_url
+        else:
+            product_url = PRODUCT_BASE + "/" + raw_url
+    else:
+        product_url = None
 
     price = None
     price_obj = item.get("price") or {}
