@@ -13,7 +13,7 @@ from scrapers.hm import HMScraper
 from scrapers.northface import NorthFaceScraper
 from scrapers.thesting import TheStingScraper
 from scrapers.elcorteingles import ElCorteInglesScraper
-from scrapers.asos_rapid import ASOSRapidScraper
+from scrapers.asos_rapid import ASOSUKScraper, ASOSEspanaScraper, ASOSAlemaniaScraper
 from agents.analyzer import analyze_store_trends, generate_weekly_report
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,9 @@ SCRAPER_CLASSES = {
     "The North Face": NorthFaceScraper,
     "The Sting": TheStingScraper,
     "El Corte Inglés": ElCorteInglesScraper,
-    "ASOS": ASOSRapidScraper,
+    "ASOS":          ASOSUKScraper,
+    "ASOS España":   ASOSEspanaScraper,
+    "ASOS Alemania": ASOSAlemaniaScraper,
 }
 
 

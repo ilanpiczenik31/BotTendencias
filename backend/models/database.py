@@ -153,14 +153,35 @@ async def seed_stores():
                 {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.thenorthface.com/es-es/c/mujer/novedades-and-tendencias/novedades-226102"},
             ]
         ),
+        # ASOS: marketplace multimarca con versiones por país
         Store(
             name="ASOS",
             url="https://www.asos.com/",
             country="UK",
             active=True,
             sections=[
-                {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.asos.com/women/new-in/", "category_id": 2623},
-                {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.asos.com/men/new-in/",   "category_id": 2606},
+                {"key": "new_arrivals_women", "label": "Novedades · Mujer",  "category_id": 2623},
+                {"key": "new_arrivals_men",   "label": "Novedades · Hombre", "category_id": 2606},
+            ]
+        ),
+        Store(
+            name="ASOS España",
+            url="https://www.asos.com/es/",
+            country="Spain",
+            active=True,
+            sections=[
+                {"key": "new_arrivals_women", "label": "Novedades · Mujer",  "category_id": 2623, "store": "ES", "lang": "es-ES", "currency": "EUR", "country": "ES"},
+                {"key": "new_arrivals_men",   "label": "Novedades · Hombre", "category_id": 2606, "store": "ES", "lang": "es-ES", "currency": "EUR", "country": "ES"},
+            ]
+        ),
+        Store(
+            name="ASOS Alemania",
+            url="https://www.asos.com/de/",
+            country="Germany",
+            active=True,
+            sections=[
+                {"key": "new_arrivals_women", "label": "Novedades · Mujer",  "category_id": 2623, "store": "DE", "lang": "de-DE", "currency": "EUR", "country": "DE"},
+                {"key": "new_arrivals_men",   "label": "Novedades · Hombre", "category_id": 2606, "store": "DE", "lang": "de-DE", "currency": "EUR", "country": "DE"},
             ]
         ),
         Store(
@@ -199,8 +220,8 @@ async def seed_stores():
             elif not existing.sections:
                 # Backfill sections for existing stores
                 existing.sections = store.sections
-            elif store.name == "ASOS":
-                # Always refresh ASOS sections to include category_id
+            elif store.name in ("ASOS", "ASOS España", "ASOS Alemania"):
+                # Always refresh ASOS sections to pick up store config params
                 existing.sections = store.sections
                 existing.url = store.url
         await session.commit()

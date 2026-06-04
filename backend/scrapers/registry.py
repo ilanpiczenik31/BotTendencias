@@ -25,9 +25,19 @@ REGISTRY: dict[str, list[dict]] = {
         {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.thesting.com/nl-nl/dames/new-in", "category_id": "dames-new-in"},
         {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.thesting.com/nl-nl/heren/new-in", "category_id": "heren-new-in"},
     ],
+    # ASOS es un marketplace multimarca (Nike, Topshop, ASOS own-label, etc.)
+    # Disponible en tres versiones regionales con precios y selección distintos
     "ASOS": [
-        {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.asos.com/women/new-in/", "category_id": 2623},
-        {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.asos.com/men/new-in/",   "category_id": 2606},
+        {"key": "new_arrivals_women", "label": "Novedades · Mujer",  "category_id": 2623},
+        {"key": "new_arrivals_men",   "label": "Novedades · Hombre", "category_id": 2606},
+    ],
+    "ASOS España": [
+        {"key": "new_arrivals_women", "label": "Novedades · Mujer",  "category_id": 2623, "store": "ES", "lang": "es-ES", "currency": "EUR", "country": "ES"},
+        {"key": "new_arrivals_men",   "label": "Novedades · Hombre", "category_id": 2606, "store": "ES", "lang": "es-ES", "currency": "EUR", "country": "ES"},
+    ],
+    "ASOS Alemania": [
+        {"key": "new_arrivals_women", "label": "Novedades · Mujer",  "category_id": 2623, "store": "DE", "lang": "de-DE", "currency": "EUR", "country": "DE"},
+        {"key": "new_arrivals_men",   "label": "Novedades · Hombre", "category_id": 2606, "store": "DE", "lang": "de-DE", "currency": "EUR", "country": "DE"},
     ],
 }
 
