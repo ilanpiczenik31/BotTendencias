@@ -145,4 +145,16 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ password }),
     }),
+  testUrl: (url: string) =>
+    apiFetch<{
+      accessible: boolean;
+      estimated_products: number;
+      confidence: "alta" | "media" | "baja";
+      page_title: string;
+      signals: Record<string, number>;
+      error: string | null;
+    }>("/api/stores/test-url", {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    }),
 };

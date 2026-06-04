@@ -251,6 +251,59 @@ class StoreCreate(BaseModel):
     country: str = "Spain"
     sections: list[dict] = []
 
+class UrlTestRequest(BaseModel):
+    url: str
+
+@router.post("/stores/test-url")
+async def test_store_url(body: UrlTestRequest):
+    """Test if a URL is scrapeable and estimate product count."""
+    import re
+    from scrapers.base import fetch_page_static
+
+    url = body.url.strip()
+    if not url.startswith("http"):
+        return {"accessible": False, "error": "URL inválida — debe empezar con http/https", "estimated_products": 0}
+
+    try:
+        soup = await fetch_page_static(url, country="es")
+    except Exception as e:
+        return {"accessible": False, "error": str(e), "estimated_products": 0}
+
+    if not soup:
+        return {"accessible": False, "error": "No se pudo acceder — la tienda puede estar bloqueando el scraping", "estimated_products": 0}
+
+    html = str(soup)
+    title = soup.find("title")
+    page_title = title.get_text(strip=True) if title else ""
+
+    # Heuristic signals for products
+    schema_products  = len(re.findall(r'"@type"\s*:\s*"Product"', html))
+    data_products    = len(re.findall(r'data-product(?:-id)?=["\']', html))
+    articles         = len(soup.find_all("article"))
+    product_classes  = len(re.findall(r'class="[^"]*product[^"]*"', html, re.I))
+    json_name_price  = len(re.findall(r'"name"\s*:\s*"[^"]{4,60}"\s*,\s*"price"', html))
+
+    # Best estimate
+    estimated = max(schema_products, json_name_price, data_products, articles // 2, product_classes // 4)
+    estimated = min(estimated, 200)  # cap sanity
+
+    confidence = "alta" if (schema_products > 5 or json_name_price > 5) else \
+                 "media" if estimated > 3 else "baja"
+
+    return {
+        "accessible": True,
+        "estimated_products": estimated,
+        "confidence": confidence,
+        "page_title": page_title,
+        "signals": {
+            "schema_products": schema_products,
+            "json_name_price": json_name_price,
+            "data_products": data_products,
+            "articles": articles,
+        },
+        "error": None,
+    }
+
 class StoreUpdate(BaseModel):
     name: str | None = None
     url: str | None = None

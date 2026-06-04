@@ -8,9 +8,71 @@ import Link from "next/link";
 import {
   Play, Settings2, Plus, Trash2, ToggleLeft, ToggleRight,
   ChevronDown, ChevronUp, Save, CheckCircle2, Loader2,
-  AlertTriangle, Globe, ArrowRight, RefreshCw, X
+  Globe, ArrowRight, RefreshCw, X, FlaskConical
 } from "lucide-react";
 import RunConfigModal from "@/components/RunConfigModal";
+
+type UrlTestResult = {
+  accessible: boolean;
+  estimated_products: number;
+  confidence: "alta" | "media" | "baja";
+  page_title: string;
+  error: string | null;
+};
+
+function UrlTestButton({ url }: { url: string }) {
+  const [state, setState] = useState<"idle" | "loading" | "done">("idle");
+  const [result, setResult] = useState<UrlTestResult | null>(null);
+
+  async function handleTest() {
+    if (!url.trim() || state === "loading") return;
+    setState("loading");
+    setResult(null);
+    try {
+      const r = await api.testUrl(url.trim());
+      setResult(r);
+      setState("done");
+    } catch {
+      setResult({ accessible: false, estimated_products: 0, confidence: "baja", page_title: "", error: "Error al conectar con el servidor" });
+      setState("done");
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <button
+        onClick={handleTest}
+        disabled={!url.trim() || state === "loading"}
+        title="Probar si esta URL se puede scrapear"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-700 text-xs text-neutral-400 hover:text-white hover:border-neutral-500 transition-colors disabled:opacity-40 whitespace-nowrap"
+      >
+        {state === "loading"
+          ? <Loader2 size={11} className="animate-spin" />
+          : <FlaskConical size={11} />}
+        {state === "loading" ? "Probando..." : "Probar URL"}
+      </button>
+
+      {state === "done" && result && (
+        <div className={`text-xs rounded-lg px-2.5 py-1.5 border ${
+          result.accessible
+            ? result.estimated_products > 5
+              ? "bg-emerald-950/40 border-emerald-800/40 text-emerald-300"
+              : "bg-yellow-950/40 border-yellow-800/40 text-yellow-300"
+            : "bg-red-950/40 border-red-800/40 text-red-300"
+        }`}>
+          {result.accessible ? (
+            <>
+              ✅ Accesible · ~<strong>{result.estimated_products}</strong> productos · confianza {result.confidence}
+              {result.page_title && <span className="text-xs opacity-60 ml-1">({result.page_title.slice(0, 30)})</span>}
+            </>
+          ) : (
+            <>❌ {result.error || "No accesible"}</>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function slugify(str: string) {
   return str.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
@@ -258,19 +320,22 @@ export default function BackofficePage() {
             <div className="space-y-2">
               <p className="text-xs text-neutral-500 font-semibold uppercase tracking-widest">Secciones a scrapear</p>
               {newSections.map((sec, i) => (
-                <div key={i} className="grid grid-cols-[1.5fr_2fr_auto] gap-2 items-center">
-                  <input value={sec.label} onChange={e => {
-                    const s = [...newSections]; s[i] = { ...s[i], label: e.target.value, key: slugify(e.target.value) }; setNewSections(s);
-                  }} placeholder="Nombre (ej: Nuevo · Mujer)"
-                    className="bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-neutral-500" />
-                  <input value={sec.url} onChange={e => {
-                    const s = [...newSections]; s[i] = { ...s[i], url: e.target.value }; setNewSections(s);
-                  }} placeholder="URL de la sección *"
-                    className="bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-neutral-500" />
-                  <button onClick={() => setNewSections(newSections.filter((_, j) => j !== i))}
-                    className="text-neutral-600 hover:text-red-400 transition-colors p-1">
-                    <Trash2 size={13} />
-                  </button>
+                <div key={i} className="space-y-1.5">
+                  <div className="grid grid-cols-[1.5fr_2fr_auto] gap-2 items-center">
+                    <input value={sec.label} onChange={e => {
+                      const s = [...newSections]; s[i] = { ...s[i], label: e.target.value, key: slugify(e.target.value) }; setNewSections(s);
+                    }} placeholder="Nombre (ej: Nuevo · Mujer)"
+                      className="bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-neutral-500" />
+                    <input value={sec.url} onChange={e => {
+                      const s = [...newSections]; s[i] = { ...s[i], url: e.target.value }; setNewSections(s);
+                    }} placeholder="URL de la sección *"
+                      className="bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-neutral-500" />
+                    <button onClick={() => setNewSections(newSections.filter((_, j) => j !== i))}
+                      className="text-neutral-600 hover:text-red-400 transition-colors p-1">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                  {sec.url.startsWith("http") && <UrlTestButton url={sec.url} />}
                 </div>
               ))}
               <button onClick={() => setNewSections([...newSections, { key: "", label: "", url: "" }])}
@@ -386,17 +451,20 @@ function StoreRow({ store, expanded, onToggleExpand, onToggleActive, onDelete, o
             <p className="text-xs text-neutral-600 italic">Sin secciones — esta tienda no se scrapeará.</p>
           )}
           {sections.map((sec, i) => (
-            <div key={i} className="grid grid-cols-[1.5fr_2fr_auto] gap-2 items-center">
-              <input value={sec.label} onChange={e => { const s = [...sections]; s[i] = { ...s[i], label: e.target.value }; setSections(s); }}
-                placeholder="Nombre visible"
-                className="bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-neutral-500" />
-              <input value={sec.url} onChange={e => { const s = [...sections]; s[i] = { ...s[i], url: e.target.value }; setSections(s); }}
-                placeholder="URL de la sección"
-                className="bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-neutral-500" />
-              <button onClick={() => setSections(sections.filter((_, j) => j !== i))}
-                className="text-neutral-600 hover:text-red-400 transition-colors p-1">
-                <Trash2 size={13} />
-              </button>
+            <div key={i} className="space-y-1.5">
+              <div className="grid grid-cols-[1.5fr_2fr_auto] gap-2 items-center">
+                <input value={sec.label} onChange={e => { const s = [...sections]; s[i] = { ...s[i], label: e.target.value }; setSections(s); }}
+                  placeholder="Nombre visible"
+                  className="bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-neutral-500" />
+                <input value={sec.url} onChange={e => { const s = [...sections]; s[i] = { ...s[i], url: e.target.value }; setSections(s); }}
+                  placeholder="URL de la sección"
+                  className="bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-neutral-500" />
+                <button onClick={() => setSections(sections.filter((_, j) => j !== i))}
+                  className="text-neutral-600 hover:text-red-400 transition-colors p-1">
+                  <Trash2 size={13} />
+                </button>
+              </div>
+              {sec.url.startsWith("http") && <UrlTestButton url={sec.url} />}
             </div>
           ))}
           <button onClick={() => setSections([...sections, { key: slugify(String(Date.now())), label: "", url: "" }])}
