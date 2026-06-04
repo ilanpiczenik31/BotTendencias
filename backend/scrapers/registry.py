@@ -25,6 +25,10 @@ REGISTRY: dict[str, list[dict]] = {
         {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.thesting.com/nl-nl/dames/new-in", "category_id": "dames-new-in"},
         {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.thesting.com/nl-nl/heren/new-in", "category_id": "heren-new-in"},
     ],
+    "ASOS": [
+        {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.asos.com/women/new-in/", "category_id": 2623},
+        {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.asos.com/men/new-in/",   "category_id": 2606},
+    ],
 }
 
 

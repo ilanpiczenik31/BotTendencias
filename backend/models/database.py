@@ -155,12 +155,12 @@ async def seed_stores():
         ),
         Store(
             name="ASOS",
-            url="https://www.asos.com/es/",
+            url="https://www.asos.com/",
             country="UK",
             active=True,
             sections=[
-                {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.asos.com/es/mujer/novedades/cat/?cid=2623"},
-                {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.asos.com/es/hombre/novedades/cat/?cid=27108"},
+                {"key": "new_arrivals_women", "label": "Nuevo · Mujer",  "url": "https://www.asos.com/women/new-in/", "category_id": 2623},
+                {"key": "new_arrivals_men",   "label": "Nuevo · Hombre", "url": "https://www.asos.com/men/new-in/",   "category_id": 2606},
             ]
         ),
         Store(
@@ -199,6 +199,10 @@ async def seed_stores():
             elif not existing.sections:
                 # Backfill sections for existing stores
                 existing.sections = store.sections
+            elif store.name == "ASOS":
+                # Always refresh ASOS sections to include category_id
+                existing.sections = store.sections
+                existing.url = store.url
         await session.commit()
 
 
