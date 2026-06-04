@@ -66,6 +66,21 @@ async def delete_all_runs(session: AsyncSession = Depends(get_session)):
     return {"message": "All runs deleted"}
 
 
+@router.delete("/runs/{run_id}")
+async def delete_run(run_id: int, session: AsyncSession = Depends(get_session)):
+    """Delete a single run and its related products, analyses and report."""
+    from sqlalchemy import delete as sql_delete
+    run = await session.get(WeeklyRun, run_id)
+    if not run:
+        raise HTTPException(404, "Run not found")
+    await session.execute(sql_delete(TrendAnalysis).where(TrendAnalysis.run_id == run_id))
+    await session.execute(sql_delete(WeeklyReport).where(WeeklyReport.run_id == run_id))
+    await session.execute(sql_delete(Product).where(Product.run_id == run_id))
+    await session.delete(run)
+    await session.commit()
+    return {"message": f"Run #{run_id} deleted"}
+
+
 @router.post("/runs/{run_id}/cancel")
 async def cancel_run(run_id: int, session: AsyncSession = Depends(get_session)):
     from datetime import datetime
